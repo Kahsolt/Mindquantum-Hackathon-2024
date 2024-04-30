@@ -16,16 +16,7 @@ Team Name: Quiscus
 - install MindSpore follow official [guide](https://www.mindspore.cn/install)
 - `pip install mindquantum`
 
-⚪ run
-
-- ???
-
-
-#### refenrence
-
-- ???
 
 ----
 by Armit
 2024/04/08
-

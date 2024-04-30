@@ -2,15 +2,11 @@
 .vscode/
 __pycache__/
 
-# data
-data/
-
 # repo
 repo/*
-!repo/*.cmd
 
 # ref
-ref/
+*/ref/*.zip
 
 # generated
 gen/
