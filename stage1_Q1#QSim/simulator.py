@@ -1,13 +1,14 @@
-import os
-import sys
-
+import os, sys
 sys.path.append(os.path.abspath(__file__))
+
 from typing import Union
+import inspect
+
 from mindquantum import Hamiltonian
 from mindquantum.simulator import Simulator
 from mindquantum.core import gates as G
 from mindquantum.core import Circuit
-import inspect
+
 from noise_model import generate_noise_model
 
 

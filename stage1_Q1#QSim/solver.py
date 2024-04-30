@@ -1,7 +1,8 @@
-import os
-import sys
-
+import os, sys
 sys.path.append(os.path.abspath(__file__))
+
+import time
+import inspect
 import argparse
 
 parse = argparse.ArgumentParser(description="测试你的求解算法。")
@@ -12,8 +13,6 @@ args = parse.parse_args()
 import simulator
 from simulator import HKSSimulator, init_shots_counter
 from utils import read_mol_data, generate_molecule
-import inspect
-import time
 if args.demo:
     from solution_demo import solution
 else:
@@ -32,10 +31,15 @@ class Solver:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        print(f"shots: {simulator.shots_counter.count}")
-        print(f"time: {self.execution_time}")
-        print(f"energy: {self.result}")
-        print(f"fci: {self.mol.fci_energy}")
+        n_shots = simulator.shots_counter.count
+        E = self.result
+        E_fci = self.mol.fci_energy
+        print(f"shots: {n_shots}")
+        print(f"time: {self.execution_time:.2f}")   # <= 2 hours
+        print(f"energy: {E:.5f}")
+        print(f"fci: {E_fci}")                      # -2.166387448634759 for the sample case
+        score = 10000 / (abs(E - E_fci) * n_shots)  # score function
+        print(f">> score: {score:.3f}")
 
     def run(self, method, molecule):
         origin_sig = '(molecule, Simulator: simulator.HKSSimulator) -> float'

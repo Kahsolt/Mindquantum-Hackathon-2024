@@ -1,16 +1,12 @@
-import pickle
+from typing import *
+
 import numpy as np
-from qaia import BSB
-from judger import Judger
-from glob import glob
+from numpy import ndarray
+
+from qaia import NMFA, SimCIM, CAC, CFC, SFC, ASB, BSB, DSB, LQA
 
 
-'''
-本赛题旨在引领选手探索新的量子启发式算法, 用于求解现代无线通信系统中的MIMO (Multiple Input Multiple Output) 检测问题.
-'''
-
-
-def to_ising(H, y, num_bits_per_symbol):
+def to_ising(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarray, ndarray]:
     '''
     Reduce MIMO detection problem into Ising problem.
 
@@ -62,32 +58,18 @@ def to_ising(H, y, num_bits_per_symbol):
     h = 2 * z.T @ H_tilde @ T
     return J, h.T
 
-# 选手提供的Ising模型生成函数，可以用我们提供的to_tsing
-def ising_generator(H, y, num_bits_per_symbol, snr):
+
+# 选手提供的Ising模型生成函数，可以用我们提供的to_ising
+def ising_generator(H:ndarray, y:ndarray, num_bits_per_symbol:int, snr:float) -> Tuple[ndarray, ndarray]:
     return to_ising(H, y, num_bits_per_symbol)
 
+
 # 选手提供的qaia MLD求解器，用mindquantum.algorithms.qaia
-def qaia_mld_solver(J, h):
-    solver = BSB(J, h, batch_size=100, n_iter=100)
+def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
+    solver = LQA(J, h, batch_size=300, n_iter=100)
     solver.update()
     sample = np.sign(solver.x)
     energy = solver.calc_energy()
     opt_index = np.argmin(energy)
     solution = sample[:, opt_index]
     return solution
-
-
-if __name__ == "__main__":
-    dataset = []
-    filelist = glob('MLD_data/*.pickle')
-    # filelist = ['MLD_data/16x16_snr10.pickle', 'MLD_data/16x16_snr10.pickle']
-
-    for filename in filelist:
-        # 读取数据
-        data = pickle.load(open(filename, 'rb'))
-        dataset.append([data['H'], data['y'], data['bits'], data['num_bits_per_symbol'], data['SNR']])
-
-    judger = Judger(dataset)
-    avgber = judger.benchmark(ising_generator, qaia_mld_solver)
-    # 测试选手的平均ber，越低越好
-    print(f"baseline avg. BER = {avgber}")

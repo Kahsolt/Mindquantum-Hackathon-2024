@@ -1,18 +1,18 @@
 """A noise model."""
-from mindquantum.core.circuit import SequentialAdder, MixerAdder, MeasureAccepter, BitFlipAdder, QubitNumberConstrain, NoiseExcluder, DepolarizingChannelAdder, ReverseAdder, NoiseChannelAdder
+
 from mindquantum.core.gates import ThermalRelaxationChannel
+from mindquantum.core.circuit import SequentialAdder, MixerAdder, MeasureAccepter, BitFlipAdder, QubitNumberConstrain, NoiseExcluder, DepolarizingChannelAdder, ReverseAdder, NoiseChannelAdder
+
 
 def generate_noise_model():
     """
     生成一个噪声模型。
     """
     noise = SequentialAdder([
-        MixerAdder(
-            [  # 测量具有比特翻转误差
-                MeasureAccepter(),
-                BitFlipAdder(0.05),
-            ],
-            add_after=False),
+        MixerAdder([  # 测量具有比特翻转误差
+            MeasureAccepter(),
+            BitFlipAdder(0.05),
+        ], add_after=False),
         MixerAdder([ # 单比特门有去极化噪声
             QubitNumberConstrain(1),
             NoiseExcluder(),
@@ -42,7 +42,7 @@ def generate_noise_model():
 
 
 if __name__ == '__main__':
-    from mindquantum import *
+    from mindquantum import qft
     circ = qft(range(3)).measure_all()
     noise_model = generate_noise_model()
     noise_circ = noise_model(circ)

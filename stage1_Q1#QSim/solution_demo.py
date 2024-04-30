@@ -1,19 +1,19 @@
-import os
-import sys
-
+import os, sys
 sys.path.append(os.path.abspath(__file__))
-from simulator import HKSSimulator
-from utils import generate_molecule, get_molecular_hamiltonian, read_mol_data
-from mindquantum.core.operators import QubitOperator, Hamiltonian, TimeEvolution
-from mindquantum.core.circuit import Circuit, UN
-from mindquantum.core.gates import X
-from mindquantum import uccsd_singlet_generator, SingleLoopProgress
-from mindquantum.core.parameterresolver import ParameterResolver
 
 import numpy as np
 from scipy.optimize import minimize
 from mindquantum.simulator import Simulator
+from mindquantum.core.operators import QubitOperator, Hamiltonian, TimeEvolution
+from mindquantum.core.gates import X
+from mindquantum.core.circuit import Circuit, UN
+from mindquantum.core.parameterresolver import ParameterResolver
 from mindquantum.algorithm.nisq import Transform
+from mindquantum.utils.progress import SingleLoopProgress
+from mindquantum.third_party.unitary_cc import uccsd_singlet_generator
+
+from simulator import HKSSimulator
+from utils import generate_molecule, get_molecular_hamiltonian, read_mol_data
 
 
 def split_hamiltonian(ham: QubitOperator):
@@ -40,18 +40,15 @@ def rotate_to_z_axis_and_add_measure(circ: Circuit, ops: QubitOperator):
 
 
 def get_ucc_circ(mol):
-    ucc = Transform(uccsd_singlet_generator(
-        mol.n_qubits, mol.n_electrons)).jordan_wigner().imag
+    ucc = Transform(uccsd_singlet_generator(mol.n_qubits, mol.n_electrons)).jordan_wigner().imag
     ucc = TimeEvolution(ucc).circuit
-
     return UN(X, mol.n_electrons) + ucc
 
 
 def get_best_params(mol, ham):
     circ = get_ucc_circ(mol)
     p0 = np.random.uniform(-np.pi, np.pi, len(circ.params_name))
-    grad_ops = Simulator('mqvector', circ.n_qubits).get_expectation_with_grad(
-        Hamiltonian(ham), circ)
+    grad_ops = Simulator('mqvector', circ.n_qubits).get_expectation_with_grad(Hamiltonian(ham), circ)
 
     def fun(x, grad_ops):
         f, g = grad_ops(x)
@@ -63,7 +60,7 @@ def get_best_params(mol, ham):
     return res.x
 
 
-def mea_single_ham(circ, ops, p, Simulator: HKSSimulator, shots=100):
+def mea_single_ham(circ, ops, p, Simulator: HKSSimulator, shots=100) -> float:
     circ = rotate_to_z_axis_and_add_measure(circ, ops)
     pr = ParameterResolver(dict(zip(circ.params_name, p)))
     sim = Simulator('mqvector', circ.n_qubits)
@@ -85,6 +82,7 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
         for idx, (coeff, ops) in enumerate(split_ham):
             result += mea_single_ham(ucc, ops, p, Simulator) * coeff
             bar.update_loop(idx)
+            break
     return result
 
 

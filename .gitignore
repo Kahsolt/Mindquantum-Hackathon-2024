@@ -5,13 +5,15 @@ __pycache__/
 # repo
 repo/*
 
-# ref
-*/ref/*.zip
+# thesis
+thesis/*
+!thesis/*.cmd
 
-# generated
-gen/
-out/
+# tmpl & submit
+*.zip
 
 # logs
+out/
 log/
 *.log
+*.hdf5

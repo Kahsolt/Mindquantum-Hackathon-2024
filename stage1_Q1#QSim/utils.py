@@ -1,8 +1,10 @@
 """Utils for VQE."""
+
 from typing import List
+
+from mindquantum import InteractionOperator, FermionOperator, Transform
 from openfermion.chem import MolecularData
 from openfermionpyscf import run_pyscf
-from mindquantum import InteractionOperator, FermionOperator, Transform
 
 
 def read_mol_data(file_name: str):
@@ -42,7 +44,7 @@ def generate_molecule(geometry: List[List[float]]) -> MolecularData:
     basis = "sto3g"
     spin = 0
     molecule_of = MolecularData(geometry, basis, multiplicity=2 * spin + 1, data_directory='./')
-    molecule_of = run_pyscf(molecule_of, run_scf=1, run_ccsd=1, run_fci=1)
+    molecule_of = run_pyscf(molecule_of, run_scf=0, run_ccsd=0, run_fci=1)
     return molecule_of
 
 

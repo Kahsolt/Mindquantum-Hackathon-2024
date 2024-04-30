@@ -1,8 +1,11 @@
 """online judger for QAIA-MLD problem"""
+
 import pickle
+from time import time
 from glob import glob
-from typing import List, Tuple
+
 import numpy as np
+from tqdm import tqdm
 
 '''
 本文件禁止改动!!!
@@ -55,6 +58,7 @@ def compute_ber(solution, bits):
 
 class Judger:
     """Judge contestant's algorithm with MLD test cases."""
+
     def __init__(self, test_cases):
         self.test_cases = test_cases
 
@@ -63,30 +67,34 @@ class Judger:
         J, h = ising_generator(H, y, num_bits_per_symbol, snr)
         bits = qaia_mld_solver(J, h)
         return bits
-    
-    def benchmark(self, ising_gen, qaia_mld_solver):
-        avgber = 0
 
-        for case in self.test_cases:
-            H, y, bits_truth, num_bits_per_symbol, snr = case
+    def benchmark(self, ising_gen, qaia_mld_solver):
+        N = len(self.test_cases)
+        avgber = 0
+        for i, case in enumerate(tqdm(self.test_cases)):
+            H, y, bits_truth, num_bits_per_symbol, snr, ZF_ber = case
             bits_decode = self.infer(ising_gen, qaia_mld_solver, H, y, num_bits_per_symbol, snr)
             ber = compute_ber(bits_decode, bits_truth)
             avgber += ber
-        avgber /= len(self.test_cases)
+            print(f'[case {i}] ans: {ber}, ref: {ZF_ber}')
+        avgber /= N
         return avgber
 
 
 if __name__ == "__main__":
     from main import ising_generator, qaia_mld_solver
-    file_path = 'MLD_data/'
-    filelist = glob(f'{file_path}*.pickle')
-    dataset = []
-    for filename in filelist:
-        # 读取数据
-        data = pickle.load(open(filename, 'rb'))
-        dataset.append([data['H'], data['y'], data['bits'], data['num_bits_per_symbol'], data['SNR']])
 
-    judger = Judger(dataset)
-    avgber = judger.benchmark(ising_generator, qaia_mld_solver)
+    dataset = []
+    filelist = glob(f'MLD_data/*.pickle')
+    # filelist = ['MLD_data/16x16_snr10.pickle']
+    for filename in filelist:
+        with open(filename, 'rb') as fh:
+            data = pickle.load(fh)
+        dataset.append([data['H'], data['y'], data['bits'], data['num_bits_per_symbol'], data['SNR'], data['ZF_ber']])
+
     # 测试选手的平均ber，越低越好
-    print(f"score: {avgber}")
+    judger = Judger(dataset)
+    t = time()
+    avgber = judger.benchmark(ising_generator, qaia_mld_solver)
+    print(f'>> time cost: {time() - t:.2f}')
+    print(f">> avg. BER = {avgber:.5f}")
