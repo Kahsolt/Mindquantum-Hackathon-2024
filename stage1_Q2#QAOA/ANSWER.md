@@ -23,14 +23,15 @@
 
 | method | score↑ | time | comment |
 | :-: | :-: | :-: | :-: |
-| PT-WMC[1] | 11730.14583 | 101.60 | use $ γ^{inf} $ in stead of $ γ^{median} $ |
+| PT-WMC[1] | 11730.14583 | 101.60 | reference, use $ γ^{inf} $ in stead of $ γ^{median} $ |
 | PS-WP[2]  | 16526.79871 | 101.72 | baseline |
 
 ⚪ submits
 
 | datetime | local score↑ | submit score↑ | comment |
 | :-: | :-: | :-: | :-: |
-| 2024-04-30 16:20:12 | 16526.79871 | ? | baseline |
+| 2024-05-01 17:02:50 | 11730.14583 | 16627.496  | reference |
+| 2024-05-01 16:44:12 | 16526.79871 | 24999.9025 | baseline  |
 
 ### reference
 

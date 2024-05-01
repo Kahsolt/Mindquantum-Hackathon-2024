@@ -82,7 +82,6 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
         for idx, (coeff, ops) in enumerate(split_ham):
             result += mea_single_ham(ucc, ops, p, Simulator) * coeff
             bar.update_loop(idx)
-            break
     return result
 
 

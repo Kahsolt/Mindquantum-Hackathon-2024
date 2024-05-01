@@ -41,7 +41,7 @@ def to_ising(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarray, nd
     Nr, Nt = H.shape
     N = 2 * Nt
     rb = int(num_bits_per_symbol/2)
-    qam_var = 1/(2**(rb-2))*np.sum(np.linspace(1,2**rb-1, 2**(rb-1))**2)
+    qam_var = 1 / (2**(rb - 2)) * np.sum(np.linspace(1, 2**rb - 1, 2**(rb - 1))**2)
     I = np.eye(N)
     T = (2**(rb - 1 - np.arange(rb)))[:, np.newaxis, np.newaxis] * I[np.newaxis, ...]
     T = T.reshape(-1, N).T
@@ -51,11 +51,12 @@ def to_ising(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarray, nd
     H_tilde = np.vstack([np.hstack([H_real, -H_imag]), np.hstack([H_imag, H_real])])
     y_tilde = np.concatenate([y.real, y.imag])
     # This is different from the original paper because we use normalized transmitted symbol
-    z = y_tilde/np.sqrt(qam_var) - H_tilde @ T @ np.ones((N * rb, 1))/qam_var + (np.sqrt(M) - 1) * H_tilde @ np.ones((N, 1))/qam_var
-    J = -2*T.T@H_tilde.T @ H_tilde @ T/qam_var
+    z = y_tilde / np.sqrt(qam_var) - H_tilde @ T @ np.ones((N * rb, 1)) / qam_var + (np.sqrt(M) - 1) * H_tilde @ np.ones((N, 1)) / qam_var
+    J = -2 * T.T @ H_tilde.T @ H_tilde @ T / qam_var
     diag_index = np.diag_indices_from(J)
     J[diag_index] = 0
     h = 2 * z.T @ H_tilde @ T
+    # [Nr*nbps, Nr*nbps], [Nr*nbps, 1]
     return J, h.T
 
 
@@ -68,8 +69,8 @@ def ising_generator(H:ndarray, y:ndarray, num_bits_per_symbol:int, snr:float) ->
 def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
     solver = LQA(J, h, batch_size=300, n_iter=100)
     solver.update()
-    sample = np.sign(solver.x)
-    energy = solver.calc_energy()
+    sample = np.sign(solver.x)      # [N=256, B]
+    energy = solver.calc_energy()   # [1, B]
     opt_index = np.argmin(energy)
-    solution = sample[:, opt_index]
+    solution = sample[:, opt_index] # [N=256], vset {-1, 1}
     return solution

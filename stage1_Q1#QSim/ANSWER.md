@@ -13,8 +13,9 @@
   - 评分: L1_err↓, n_shots↓
   - 限时: 2h
 - 考点
-  - ansatz design
-  - error mitigate
+  - pauli grouping/trimming (测量尽可能少的pauli串，平衡coeff数值精度)
+  - light-weight ansatz design (用尽可能少的门)
+  - error mitigate (去除空线路噪声/ZNE/多测几次取最低)
 
 ### solution
 
@@ -38,7 +39,7 @@
 
 | datetime | local score↑ | submit score↑ | comment |
 | :-: | :-: | :-: | :-: |
-| ? | ? | ? | ? |
+| 2024-05-01 20:38:16 | 1.035 | 0.5226 | baseline, trim coeff < 1e-3, shot=30 |
 
 ----
 by Armit

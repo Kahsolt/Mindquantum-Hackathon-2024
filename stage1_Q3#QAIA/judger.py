@@ -25,11 +25,11 @@ def compute_ber(solution, bits):
     
     Input
     -----
-    solution: [2*Nt, ], np.int
-        The binary array filled with ones and minus one.
+    solution: [Nt*nbps, ], np.int
+        The binary array filled with ones and minus ones.
 
-    bits: [2*Nt, ], np.int
-        The binary array filled with ones and minus one.
+    bits: [Nt, nbps], np.int
+        The binary array filled with ones and zeros.
     Ouput
     -----
     ber: np.float
@@ -69,7 +69,6 @@ class Judger:
         return bits
 
     def benchmark(self, ising_gen, qaia_mld_solver):
-        N = len(self.test_cases)
         avgber = 0
         for i, case in enumerate(tqdm(self.test_cases)):
             H, y, bits_truth, num_bits_per_symbol, snr, ZF_ber = case
@@ -77,7 +76,7 @@ class Judger:
             ber = compute_ber(bits_decode, bits_truth)
             avgber += ber
             print(f'[case {i}] ans: {ber}, ref: {ZF_ber}')
-        avgber /= N
+        avgber /= len(self.test_cases)
         return avgber
 
 

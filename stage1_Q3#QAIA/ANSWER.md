@@ -42,13 +42,25 @@
 | :-: | :-: | :-: | :-: |
 | 2024-04-30 21:12:31 | 0.20400 | 0.7969 | LQA (B=300) |
 
+### dataset
+
+```
+[H] {(64, 64): 75, (128, 128): 75}
+[y] {(64, 1): 75, (128, 1): 75}
+[bits] {(64, 4): 30, (128, 6): 30, (64, 8): 15, (128, 8): 15, (128, 4): 30, (64, 6): 30}
+[num_bits_per_symbol] {4: 60, 6: 60, 8: 30}
+[SNR] {10: 50, 15: 50, 20: 50}
+```
+
 ### reference
 
 - [1] High-performance combinatorial optimization based on classical mechanics (2021): [https://www.researchgate.net/publication/349022706_High-performance_combinatorial_optimization_based_on_classical_mechanics](https://www.researchgate.net/publication/349022706_High-performance_combinatorial_optimization_based_on_classical_mechanics)
 - [2] Quadratic Unconstrained Binary Optimization via Quantum-Inspired Annealing (2022): [https://www.researchgate.net/publication/363382279_Quadratic_Unconstrained_Binary_Optimization_via_Quantum-Inspired_Annealing](https://www.researchgate.net/publication/363382279_Quadratic_Unconstrained_Binary_Optimization_via_Quantum-Inspired_Annealing)
-- [3] Ising Machines' Dynamics and Regularization for Near-Optimal Large and Massive MIMO Detection (2021): [https://arxiv.org/abs/2105.10535](https://arxiv.org/abs/2105.10535)
-- [4] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection (2023): [https://arxiv.org/abs/2306.16264](https://arxiv.org/abs/2306.16264)
-- [5] Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach (2023): [https://arxiv.org/abs/2304.12830](https://arxiv.org/abs/2304.12830)
+- [3] Leveraging Quantum Annealing for Large MIMO Processing in Centralized Radio Access Networks (2020): [https://arxiv.org/abs/2001.04014](https://arxiv.org/abs/2001.04014)
+- [4] Physics-Inspired Heuristics for Soft MIMO Detection in 5G New Radio and Beyond (2021): [https://arxiv.org/abs/2103.10561](https://arxiv.org/abs/2103.10561)
+- [5] Ising Machines' Dynamics and Regularization for Near-Optimal Large and Massive MIMO Detection (2021): [https://arxiv.org/abs/2105.10535](https://arxiv.org/abs/2105.10535)
+- [6] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection (2023): [https://arxiv.org/abs/2306.16264](https://arxiv.org/abs/2306.16264)
+- [7] Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach (2023): [https://arxiv.org/abs/2304.12830](https://arxiv.org/abs/2304.12830)
 
 ----
 by Armit
