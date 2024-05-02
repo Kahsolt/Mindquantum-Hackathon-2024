@@ -55,4 +55,13 @@ class Solver:
 
 # 自动调用你的解答方法。
 with Solver() as solver:
-    solver.run(solution, read_mol_data(args.file))
+    # TODO: tmp test data
+    #dist = 0.1
+    #molecule = [
+    #    ['H', [0.0, 0.0, 0.0 * dist]],
+    #    ['H', [0.0, 0.0, 1.0 * dist]],
+    #    ['H', [0.0, 0.0, 2.0 * dist]],
+    #    ['H', [0.0, 0.0, 3.0 * dist]],
+    #]
+    molecule = read_mol_data(args.file)
+    solver.run(solution, molecule)

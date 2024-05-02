@@ -40,6 +40,13 @@
 | datetime | local score↑ | submit score↑ | comment |
 | :-: | :-: | :-: | :-: |
 | 2024-05-01 20:38:16 | 1.035 | 0.5226 | baseline, trim coeff < 1e-3, shot=30 |
+| 2024-05-02 23:20:24 | 1.334 | 0.574  | ry_HEA, trim coeff < 1e-3, shots=100 |
+| 2024-05-02 23:28:58 | 2.360 | 0.7994 | HF, trim coeff < 1e-3, shots=100 |
+
+
+### reference
+
+- solution from Tencent Quantum Lab: [https://github.com/liwt31/QC-Contest-Demo](https://github.com/liwt31/QC-Contest-Demo)
 
 ----
 by Armit

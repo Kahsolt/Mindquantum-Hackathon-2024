@@ -27,3 +27,5 @@ REM Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection
 wget -nc https://arxiv.org/pdf/2306.16264.pdf
 REM Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach
 wget -nc https://arxiv.org/pdf/2304.12830.pdf
+REM Simulated Bifurcation Algorithm for MIMO Detection
+wget -nc https://arxiv.org/pdf/2210.14660.pdf

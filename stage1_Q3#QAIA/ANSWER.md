@@ -12,6 +12,7 @@
 - 考点
   - MLD 问题转换为 Ising 问题
   - 改进 QAIA 算法，例如基于 SB 系列发展，或混合各类算法
+  - 基线代码已经实现 `arXiv:2105.10535 [5]`，应该是希望选手进一步实现 `arXiv:2306.16264 [6]`
 
 ### solution
 
@@ -29,7 +30,7 @@
 | SFC    | 0.23796 | 278.40 |  |
 | ASB    | 0.34054 | 253.43 | dt=0.1 (default dt=1 doesn't run) |
 | DSB    | 0.28741 | 230.11 |  |
-| BSB[1] | 0.21584 | 135.38 | baseline (B=100, n_iter=100) |
+| BSB[1] | 0.21584 | 135.38 | baseline[5] (B=100, n_iter=100) |
 | LQA[2] | 0.20627 | 229.35 | best, but too classical |
 | LQA[2] | 0.21652 | 134.27 | B=100, n_iter=50  |
 | LQA[2] | 0.21379 | 719.15 | B=100, n_iter=300 |
@@ -41,6 +42,7 @@
 | datetime | local BER↓ | submit score↑ | comment |
 | :-: | :-: | :-: | :-: |
 | 2024-04-30 21:12:31 | 0.20400 | 0.7969 | LQA (B=300) |
+| 2024-05-02 21:25:46 | 0.21442 | 0.7834 | baseline (B=300) |
 
 ### dataset
 
@@ -50,6 +52,21 @@
 [bits] {(64, 4): 30, (128, 6): 30, (64, 8): 15, (128, 8): 15, (128, 4): 30, (64, 6): 30}
 [num_bits_per_symbol] {4: 60, 6: 60, 8: 30}
 [SNR] {10: 50, 15: 50, 20: 50}
+
+BER wrt. each param groups under baseline setting:
+>> avgber_per_Nt:
+  64: 0.21421875
+  128: 0.21439670138888892
+>> avgber_per_snr:
+  10: 0.2542643229166667
+  15: 0.20962239583333336
+  20: 0.17903645833333337
+>> avgber_per_nbps:
+  4: 0.13942057291666668
+  6: 0.2408637152777778
+  8: 0.31097005208333334
+>> time cost: 134.46
+>> avg. BER = 0.21431
 ```
 
 ### reference
@@ -61,6 +78,10 @@
 - [5] Ising Machines' Dynamics and Regularization for Near-Optimal Large and Massive MIMO Detection (2021): [https://arxiv.org/abs/2105.10535](https://arxiv.org/abs/2105.10535)
 - [6] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection (2023): [https://arxiv.org/abs/2306.16264](https://arxiv.org/abs/2306.16264)
 - [7] Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach (2023): [https://arxiv.org/abs/2304.12830](https://arxiv.org/abs/2304.12830)
+- [8] Simulated Bifurcation Algorithm for MIMO Detection (2022): [https://arxiv.org/abs/2210.14660](https://arxiv.org/abs/2210.14660)
+- [9] Sionna: library for simulating the physical layer of wireless and optical communication systems
+  - repo: [https://github.com/NVlabs/sionna](https://github.com/NVlabs/sionna)
+  - doc: [https://nvlabs.github.io/sionna/index.html](https://nvlabs.github.io/sionna/index.html)
 
 ----
 by Armit

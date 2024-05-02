@@ -168,11 +168,12 @@ class BSB(SB):  # noqa: N801
                 self.y += (-(self.delta - self.p[i]) * self.x + self.xi * self.J.dot(self.x)) * self.dt
             else:
                 self.y += (-(self.delta - self.p[i]) * self.x + self.xi * (self.J.dot(self.x) + self.h)) * self.dt
+            # Euler method
             self.x += self.dt * self.y * self.delta
 
             cond = np.abs(self.x) > 1
-            self.x = np.where(cond, np.sign(self.x), self.x)
-            self.y = np.where(cond, np.zeros_like(self.x), self.y)
+            self.x = np.where(cond, np.sign(self.x), self.x)          # limit x to vrng [-1, +1]
+            self.y = np.where(cond, np.zeros_like(self.x), self.y)    # if |x|==1 is fully annealled, set y to zero
 
 
 class DSB(SB):  # noqa: N801
@@ -214,9 +215,7 @@ class DSB(SB):  # noqa: N801
             if self.h is None:
                 self.y += (-(self.delta - self.p[i]) * self.x + self.xi * self.J.dot(np.sign(self.x))) * self.dt
             else:
-                self.y += (
-                    -(self.delta - self.p[i]) * self.x + self.xi * (self.J.dot(np.sign(self.x)) + self.h)
-                ) * self.dt
+                self.y += (-(self.delta - self.p[i]) * self.x + self.xi * (self.J.dot(np.sign(self.x)) + self.h)) * self.dt
 
             self.x += self.dt * self.y * self.delta
 
