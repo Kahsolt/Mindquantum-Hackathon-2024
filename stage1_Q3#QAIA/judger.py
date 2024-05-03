@@ -64,10 +64,22 @@ def compute_ber(solution:ndarray, bits:ndarray) -> float:
     bits_hat = bits_hat.T.copy()            # [Nt, 2*rb]
     bits_hat[bits_hat == -1] = 0            # convert Ising {-1, 1} to QUBO {0, 1}
     # QuAMax => intermediate code
+    '''
+    [QuAMax-style]
+        0011 0111 1011 1111
+        0010 0110 1010 1110
+        0001 0101 1001 1101
+        0000 0100 1000 1100
+    [intermediate-style]
+        0011 0100 1011 1100
+        0010 0101 1010 1101
+        0001 0110 1001 1110
+        0000 0111 1000 1111
+    '''
     output_bit = bits_hat.copy()                        # copy b[0]
     index = np.nonzero(bits_hat[:, rb-1] == 1)[0]       # select even columns
     bits_hat[index, rb:] = 1 - bits_hat[index, rb:]     # invert bits of high part (flip upside-down)
-    # Differential bit encoding, intermediate code => gray code
+    # Differential bit encoding, intermediate code => gray code (constellation-style)
     for i in range(1, num_bits_per_symbol):             # b[i] = b[i] ^ b[i-1]
         output_bit[:, i] = np.logical_xor(bits_hat[:, i], bits_hat[:, i - 1])
     # calc BER

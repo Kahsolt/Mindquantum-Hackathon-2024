@@ -18,6 +18,29 @@
 
 - run `python judger.py`
 
+⚪ baselines (classical)
+
+| method | BER↓ | comment |
+| :-: | :-: | :-: |
+| linear-zf-maxlog    | 0.41121 | match with the reference :) |
+| linear-zf-app       | 0.40605 |  |
+| linear-mf-maxlog    | 0.34104 |  |
+| linear-mf-app       | 0.33401 |  |
+| linear-lmmse-maxlog | 0.20779 |  |
+| linear-lmmse-app    | 0.20721 | very fast; app > maxlog, lmmse > mf > zf |
+| kbest-k=16          | 0.27594 | very slow |
+| kbest-k=32          | 0.26785 |  |
+| kbest-k=64          | 0.26206 |  |
+| ep-iter=5           | 0.16968 | fast and nice! |
+| ep-iter=10          | 0.16872 |  |
+| ep-iter=20          | 0.16887 |  |
+| ep-iter=40          | 0.16889 |  |
+| mmse-iter=1         | 0.19903 | mmse is all cheaty, only for seeking BER lower bound!! |
+| mmse-iter=2         | 0.16875 |  |
+| mmse-iter=4         | 0.15921 |  |
+| mmse-iter=8         | 0.15738 |  |
+| mmse-iter=16        | 0.15768 |  |
+
 ⚪ baselines
 
 | method | BER↓ | time | comment |
@@ -82,6 +105,8 @@ BER wrt. each param groups under baseline setting:
 - [9] Sionna: library for simulating the physical layer of wireless and optical communication systems
   - repo: [https://github.com/NVlabs/sionna](https://github.com/NVlabs/sionna)
   - doc: [https://nvlabs.github.io/sionna/index.html](https://nvlabs.github.io/sionna/index.html)
+- [10] REM DUIDD: Deep-Unfolded Interleaved Detection and Decoding for MIMO Wireless Systems (2022): [https://arxiv.org/abs/2212.07816](https://arxiv.org/abs/2212.07816)
+  - repo: [https://github.com/IIP-Group/DUIDD](https://github.com/IIP-Group/DUIDD)
 
 ----
 by Armit

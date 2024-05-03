@@ -29,3 +29,5 @@ REM Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach
 wget -nc https://arxiv.org/pdf/2304.12830.pdf
 REM Simulated Bifurcation Algorithm for MIMO Detection
 wget -nc https://arxiv.org/pdf/2210.14660.pdf
+REM DUIDD: Deep-Unfolded Interleaved Detection and Decoding for MIMO Wireless Systems
+wget -nc https://arxiv.org/pdf/2212.07816.pdf
