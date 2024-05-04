@@ -59,6 +59,17 @@
 | LQA[2] | 0.21379 | 719.15 | B=100, n_iter=300 |
 | LQA[2] | 0.20624 | 146.68 | B=50,  n_iter=100 |
 | LQA[2] | 0.20400 | 710.05 | B=300, n_iter=100 |
+| LM-dSB-λ=1   [6] | 0.24885 | 231.01 |  |
+| LM-dSB-λ=10  [6] | 0.20904 | 230.00 |  |
+| LM-dSB-λ=100 [6] | 0.22511 | 231.73 |  |
+| LM-bSB-λ=10  [6] | 0.19404 | 244.38 |  |
+| LM-bSB-λ=16  [6] | 0.19014 | 237.22 |  |
+| LM-bSB-λ=20  [6] | 0.18730 | 240.16 |  |
+| LM-bSB-λ=25  [6] | 0.18591 | 237.92 |  |
+| LM-bSB-λ=50  [6] | 0.18846 | 236.54 |  |
+| LM-bSB-λ=75  [6] | 0.19032 | 237.38 |  |
+| LM-bSB-λ=100 [6] | 0.19191 | 238.30 |  |
+| LM-bSB-λ=1000[6] | 0.20808 | 240.27 |  |
 
 ⚪ submits
 
@@ -66,6 +77,7 @@
 | :-: | :-: | :-: | :-: |
 | 2024-04-30 21:12:31 | 0.20400 | 0.7969 | LQA (B=300) |
 | 2024-05-02 21:25:46 | 0.21442 | 0.7834 | baseline (B=300) |
+| 2024-05-04 23:41:04 | 0.18591 |        | LM-bSB-λ=25 |
 
 ### dataset
 
@@ -94,6 +106,28 @@ BER wrt. each param groups under baseline setting:
 
 ### reference
 
+The story timeline:
+
+```
+[2001.04014] Leveraging Quantum Annealing for Large MIMO Processing in Centralized Radio Access Networks (2020)
+    - QuAMax + Quantum Anealing (D-Wave) + 4x4 16-QAM
+    - the init SA impl, handle small H case
+[2105.10535] Ising Machines' Dynamics and Regularization for Near-Optimal Large and Massive MIMO Detection
+    - RI-MIMO/TRIM + CIM + 64x64 16-QAM (err: ~0.3)
+    - the init QAIA impl, add reg_term $x_{LMMSE}$, proper baseline
+  -> [2210.14660] Simulated Bifurcation Algorithm for MIMO Detection
+      - RI-MIMO + dSB (G-SB) + 64x64 16-QAM (err: ~0.11)
+      - upgrade CIM to dSB
+    -> [2306.16264] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection
+        - LM-SB/DU-LM-SB + bSB + 32x32 QPSK/4-QAM (err: ~1e-6??)
+        - use LM algo, add DU
+  -> [2304.12830] Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach
+      - MDI-MIMO + CIM + 32x32 256-QAM (err: ~1e-4??)
+      - multi-stage iterative of
+          1. set reference solution $x_{MMSE}$ and $x_{MMSE-SIC}$ as init guess $x^*$
+          2. search better results in a subspace $D_R$ around $x^*$
+```
+
 - [1] High-performance combinatorial optimization based on classical mechanics (2021): [https://www.researchgate.net/publication/349022706_High-performance_combinatorial_optimization_based_on_classical_mechanics](https://www.researchgate.net/publication/349022706_High-performance_combinatorial_optimization_based_on_classical_mechanics)
 - [2] Quadratic Unconstrained Binary Optimization via Quantum-Inspired Annealing (2022): [https://www.researchgate.net/publication/363382279_Quadratic_Unconstrained_Binary_Optimization_via_Quantum-Inspired_Annealing](https://www.researchgate.net/publication/363382279_Quadratic_Unconstrained_Binary_Optimization_via_Quantum-Inspired_Annealing)
 - [3] Leveraging Quantum Annealing for Large MIMO Processing in Centralized Radio Access Networks (2020): [https://arxiv.org/abs/2001.04014](https://arxiv.org/abs/2001.04014)
@@ -105,7 +139,7 @@ BER wrt. each param groups under baseline setting:
 - [9] Sionna: library for simulating the physical layer of wireless and optical communication systems
   - repo: [https://github.com/NVlabs/sionna](https://github.com/NVlabs/sionna)
   - doc: [https://nvlabs.github.io/sionna/index.html](https://nvlabs.github.io/sionna/index.html)
-- [10] REM DUIDD: Deep-Unfolded Interleaved Detection and Decoding for MIMO Wireless Systems (2022): [https://arxiv.org/abs/2212.07816](https://arxiv.org/abs/2212.07816)
+- [10] DUIDD: Deep-Unfolded Interleaved Detection and Decoding for MIMO Wireless Systems (2022): [https://arxiv.org/abs/2212.07816](https://arxiv.org/abs/2212.07816)
   - repo: [https://github.com/IIP-Group/DUIDD](https://github.com/IIP-Group/DUIDD)
 
 ----

@@ -80,6 +80,9 @@ class QAIA:
             return -0.5 * np.sum(self.J.dot(sign) * sign, axis=0)
         return -0.5 * np.sum(self.J.dot(sign) * sign, axis=0, keepdims=True) - self.h.T.dot(sign)
 
+    def update(self):
+        raise NotImplementedError
+
 
 class OverflowException(Exception):
     r"""

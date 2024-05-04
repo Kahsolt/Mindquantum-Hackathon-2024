@@ -3,10 +3,10 @@ from typing import *
 import numpy as np
 from numpy import ndarray
 
-from qaia import NMFA, SimCIM, CAC, CFC, SFC, ASB, BSB, DSB, LQA
+from qaia import QAIA, NMFA, SimCIM, CAC, CFC, SFC, ASB, BSB, DSB, LQA
 
 
-def to_ising(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarray, ndarray]:
+def to_ising(H:ndarray, y:ndarray, nbps:int) -> Tuple[ndarray, ndarray]:
     '''
     Reduce MIMO detection problem into Ising problem.
 
@@ -34,12 +34,12 @@ def to_ising(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarray, nd
     '''
 
     # the size of constellation, the M-QAM where M in {16, 64, 256}
-    M = 2**num_bits_per_symbol
+    M = 2**nbps
     # n_elem at TX side (c=2 for real/imag, 1 symbol = 2 elem)
     Nr, Nt = H.shape
     N = 2 * Nt
     # n_bits/n_spins that one elem decodes to
-    rb = num_bits_per_symbol // 2
+    rb = nbps // 2
 
     # QAM variance for normalization
     # ref: https://dsplog.com/2007/09/23/scaling-factor-in-qam/
@@ -70,20 +70,18 @@ def to_ising(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarray, nd
     # [rb*N, rb*N], [rb*N, 1]
     return J, h.T
 
-
-def to_ising_LM_SB(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarray, ndarray]:
+def to_ising_LM_SB(H:ndarray, y:ndarray, nbps:int, lmbd:int=1) -> Tuple[ndarray, ndarray]:
     ''' LM-SB in [arXiv:2306.16264] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection '''
 
     # the size of constellation, the M-QAM where M in {16, 64, 256}
-    M = 2**num_bits_per_symbol
+    M = 2**nbps
     # n_elem at TX side (c=2 for real/imag, 1 symbol = 2 elem)
     Nr, Nt = H.shape
     N = 2 * Nt
     # n_bits/n_spins that one elem decodes to
-    rb = num_bits_per_symbol // 2
+    rb = nbps // 2
 
     # QAM variance for normalization
-    # ref: https://dsplog.com/2007/09/23/scaling-factor-in-qam/
     qam_var = 2 * (M - 1) / 3
 
     # Eq. 7 the transform matrix T
@@ -101,28 +99,36 @@ def to_ising_LM_SB(H:ndarray, y:ndarray, num_bits_per_symbol:int) -> Tuple[ndarr
     y_tilde = np.concatenate([y.real, y.imag])
 
     # Eq. 10
-    lmbd = 100000
-    U_reg = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd   # LMMSE-like part
-    J = -T.T @ H_tilde.T @ U_reg @ H_tilde @ T * (2 / qam_var)
+    U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd   # LMMSE-like part
+    J = -T.T @ H_tilde.T @ U_λ @ H_tilde @ T * (2 / qam_var)
     J[np.diag_indices_from(J)] = 0
     z = y_tilde / np.sqrt(qam_var) - H_tilde @ T @ np.ones((N * rb, 1)) / qam_var + (np.sqrt(M) - 1) * H_tilde @ np.ones((N, 1)) / qam_var
-    h = 2 * z.T @ H_tilde @ U_reg @ T
+    h = 2 * z.T @ U_λ.T @ H_tilde @ T
 
     # [rb*N, rb*N], [rb*N, 1]
     return J, h.T
 
+def to_ising_DU_LM_SB(H:ndarray, y:ndarray, nbps:int) -> Tuple[ndarray, ndarray]:
+    ''' DU-LM-SB in [arXiv:2306.16264] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection '''
 
-# 选手提供的Ising模型生成函数，可以用我们提供的to_ising
-def ising_generator(H:ndarray, y:ndarray, num_bits_per_symbol:int, snr:float) -> Tuple[ndarray, ndarray]:
-    return to_ising(H, y, num_bits_per_symbol)
+def to_ising_MDI_MIMO(H:ndarray, y:ndarray, nbps:int) -> Tuple[ndarray, ndarray]:
+    ''' MDI-MIMO from [2304.12830] Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach '''
 
 
-# 选手提供的qaia MLD求解器，用mindquantum.algorithms.qaia
-def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
-    solver = LQA(J, h, batch_size=300, n_iter=100)
+def solver_qaia_lib(qaia_cls:type[QAIA], J:ndarray, h:ndarray) -> ndarray:
+    solver = qaia_cls(J, h, batch_size=100, n_iter=100)
     solver.update()
     sample = np.sign(solver.x)      # [rb*N, B]
     energy = solver.calc_energy()   # [1, B]
     opt_index = np.argmin(energy)
     solution = sample[:, opt_index] # [rb*N], vset {-1, 1}
     return solution
+
+
+# 选手提供的Ising模型生成函数，可以用我们提供的to_ising
+def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> Tuple[ndarray, ndarray]:
+    return to_ising_LM_SB(H, y, nbps, lmbd=25)
+
+# 选手提供的qaia MLD求解器，用mindquantum.algorithms.qaia
+def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
+    return solver_qaia_lib(BSB, J, h)
