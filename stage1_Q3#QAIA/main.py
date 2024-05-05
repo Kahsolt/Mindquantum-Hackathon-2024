@@ -1,12 +1,21 @@
-from typing import *
+import json
+from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 from numpy import ndarray
 
 from qaia import QAIA, NMFA, SimCIM, CAC, CFC, SFC, ASB, BSB, DSB, LQA
+from qaia import DUSB
+
+BASE_PATH = Path(__file__).parent
+LOG_PATH = BASE_PATH / 'log'
+DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=30_lr=0.01.json'
+
+J_h = Tuple[ndarray, ndarray]
 
 
-def to_ising(H:ndarray, y:ndarray, nbps:int) -> Tuple[ndarray, ndarray]:
+def to_ising(H:ndarray, y:ndarray, nbps:int) -> J_h:
     '''
     Reduce MIMO detection problem into Ising problem.
 
@@ -70,7 +79,7 @@ def to_ising(H:ndarray, y:ndarray, nbps:int) -> Tuple[ndarray, ndarray]:
     # [rb*N, rb*N], [rb*N, 1]
     return J, h.T
 
-def to_ising_LM_SB(H:ndarray, y:ndarray, nbps:int, lmbd:int=1) -> Tuple[ndarray, ndarray]:
+def to_ising_LM_SB(H:ndarray, y:ndarray, nbps:int, lmbd:int=25) -> J_h:
     ''' LM-SB in [arXiv:2306.16264] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection '''
 
     # the size of constellation, the M-QAM where M in {16, 64, 256}
@@ -99,7 +108,7 @@ def to_ising_LM_SB(H:ndarray, y:ndarray, nbps:int, lmbd:int=1) -> Tuple[ndarray,
     y_tilde = np.concatenate([y.real, y.imag])
 
     # Eq. 10
-    U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd   # LMMSE-like part
+    U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd   # LMMSE-like part, with our fix
     J = -T.T @ H_tilde.T @ U_λ @ H_tilde @ T * (2 / qam_var)
     J[np.diag_indices_from(J)] = 0
     z = y_tilde / np.sqrt(qam_var) - H_tilde @ T @ np.ones((N * rb, 1)) / qam_var + (np.sqrt(M) - 1) * H_tilde @ np.ones((N, 1)) / qam_var
@@ -108,15 +117,33 @@ def to_ising_LM_SB(H:ndarray, y:ndarray, nbps:int, lmbd:int=1) -> Tuple[ndarray,
     # [rb*N, rb*N], [rb*N, 1]
     return J, h.T
 
-def to_ising_DU_LM_SB(H:ndarray, y:ndarray, nbps:int) -> Tuple[ndarray, ndarray]:
-    ''' DU-LM-SB in [arXiv:2306.16264] Deep Unfolded Simulated Bifurcation for Massive MIMO Signal Detection '''
+def to_ising_DU_LM_SB(H:ndarray, y:ndarray, nbps:int) -> J_h:
+    with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
+        params = json.load(fh)
+        lmbd = params['lmbd']
 
-def to_ising_MDI_MIMO(H:ndarray, y:ndarray, nbps:int) -> Tuple[ndarray, ndarray]:
+    return to_ising_LM_SB(H, y, nbps, lmbd=lmbd)
+
+def to_ising_MDI_MIMO(H:ndarray, y:ndarray, nbps:int) -> J_h:
     ''' MDI-MIMO from [2304.12830] Uplink MIMO Detection using Ising Machines: A Multi-Stage Ising Approach '''
 
 
-def solver_qaia_lib(qaia_cls:type[QAIA], J:ndarray, h:ndarray) -> ndarray:
-    solver = qaia_cls(J, h, batch_size=100, n_iter=100)
+def solver_qaia_lib(qaia_cls, J:ndarray, h:ndarray) -> ndarray:
+    solver: QAIA = qaia_cls(J, h, batch_size=100, n_iter=100)
+    solver.update()
+    sample = np.sign(solver.x)      # [rb*N, B]
+    energy = solver.calc_energy()   # [1, B]
+    opt_index = np.argmin(energy)
+    solution = sample[:, opt_index] # [rb*N], vset {-1, 1}
+    return solution
+
+def solver_DU_LM_SB(J:ndarray, h:ndarray) -> ndarray:
+    with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
+        params = json.load(fh)
+        deltas = params['deltas']
+        eta = params['eta']
+
+    solver = DUSB(J, h, deltas, eta, batch_size=100)
     solver.update()
     sample = np.sign(solver.x)      # [rb*N, B]
     energy = solver.calc_energy()   # [1, B]
@@ -126,9 +153,11 @@ def solver_qaia_lib(qaia_cls:type[QAIA], J:ndarray, h:ndarray) -> ndarray:
 
 
 # 选手提供的Ising模型生成函数，可以用我们提供的to_ising
-def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> Tuple[ndarray, ndarray]:
-    return to_ising_LM_SB(H, y, nbps, lmbd=25)
+def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> J_h:
+    #return to_ising_LM_SB(H, y, nbps, lmbd=25)
+    return to_ising_DU_LM_SB(H, y, nbps)
 
 # 选手提供的qaia MLD求解器，用mindquantum.algorithms.qaia
 def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
-    return solver_qaia_lib(BSB, J, h)
+    #return solver_qaia_lib(BSB, J, h)
+    return solver_DU_LM_SB(J, h)

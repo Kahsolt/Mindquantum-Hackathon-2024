@@ -16,9 +16,10 @@
 
 ### solution
 
-- run `python judger.py`
-
 ⚪ baselines (classical)
+
+- `pip install sionna`
+- run `python run_baseline.py`
 
 | method | BER↓ | comment |
 | :-: | :-: | :-: |
@@ -42,6 +43,8 @@
 | mmse-iter=16        | 0.15768 |  |
 
 ⚪ baselines
+
+- run `python judger.py`
 
 | method | BER↓ | time | comment |
 | :-: | :-: | :-: | :-: |
@@ -70,6 +73,7 @@
 | LM-bSB-λ=75  [6] | 0.19032 | 237.38 |  |
 | LM-bSB-λ=100 [6] | 0.19191 | 238.30 |  |
 | LM-bSB-λ=1000[6] | 0.20808 | 240.27 |  |
+| DU-LM-SB-T=30[6] | 0.19497 |  76.91 | overfit |
 
 ⚪ submits
 
@@ -77,7 +81,7 @@
 | :-: | :-: | :-: | :-: |
 | 2024-04-30 21:12:31 | 0.20400 | 0.7969 | LQA (B=300) |
 | 2024-05-02 21:25:46 | 0.21442 | 0.7834 | baseline (B=300) |
-| 2024-05-04 23:41:04 | 0.18591 |        | LM-bSB-λ=25 |
+| 2024-05-06 11:37:08 | 0.18597 | 0.8136 | LM-bSB-λ=25 |
 
 ### dataset
 
@@ -88,20 +92,20 @@
 [num_bits_per_symbol] {4: 60, 6: 60, 8: 30}
 [SNR] {10: 50, 15: 50, 20: 50}
 
-BER wrt. each param groups under baseline setting:
+BER wrt. each param groups under latest best method:
 >> avgber_per_Nt:
-  64: 0.21421875
-  128: 0.21439670138888892
+  64: 0.18860243055555556
+  128: 0.18335503472222223
 >> avgber_per_snr:
-  10: 0.2542643229166667
-  15: 0.20962239583333336
-  20: 0.17903645833333337
+  10: 0.26107421875
+  15: 0.18069010416666667
+  20: 0.116171875
 >> avgber_per_nbps:
-  4: 0.13942057291666668
-  6: 0.2408637152777778
-  8: 0.31097005208333334
->> time cost: 134.46
->> avg. BER = 0.21431
+  4: 0.10494791666666667
+  6: 0.21564670138888892
+  8: 0.2887044270833333
+>> time cost: 335.17
+>> avg. BER = 0.18598
 ```
 
 ### reference

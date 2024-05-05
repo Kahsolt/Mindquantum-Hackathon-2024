@@ -23,6 +23,8 @@ from .SB import ASB, BSB, DSB
 from .SFC import SFC
 from .SimCIM import SimCIM
 
+from .DUSB import DUSB
+
 __all__ = [
     "QAIA",
     "CAC",
@@ -34,4 +36,6 @@ __all__ = [
     "DSB",
     "SFC",
     "SimCIM",
+
+    "DUSB",
 ]

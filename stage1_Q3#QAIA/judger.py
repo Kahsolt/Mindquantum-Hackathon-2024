@@ -1,5 +1,3 @@
-"""online judger for QAIA-MLD problem"""
-
 import pickle
 from time import time
 from glob import glob
@@ -7,10 +5,6 @@ from glob import glob
 import numpy as np
 from numpy import ndarray
 from tqdm import tqdm
-
-'''
-本文件禁止改动!!!
-'''
 
 
 def compute_ber(solution:ndarray, bits:ndarray) -> float:
@@ -88,7 +82,6 @@ def compute_ber(solution:ndarray, bits:ndarray) -> float:
 
 
 class Judger:
-    """Judge contestant's algorithm with MLD test cases."""
 
     def __init__(self, test_cases):
         self.test_cases = test_cases

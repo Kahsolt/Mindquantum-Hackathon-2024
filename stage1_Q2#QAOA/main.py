@@ -73,5 +73,5 @@ def main(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12) -> Tuple[ndarray, nd
                     betas = np.array([float(new_row[i]) for i in range(3 + p, 3 + 2 * p)])
     # rescale the parameters for specific case
     gammas = trans_gamma(gammas, D)
-    factor = rescale_factor(Jc_dict)
+    factor = rescale_factor(Jc_dict) * 1.275
     return gammas * factor, betas

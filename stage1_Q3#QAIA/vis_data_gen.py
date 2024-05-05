@@ -14,6 +14,18 @@ from run_baseline import *
 bits_to_number = lambda bits: bits.dot(1 << np.arange(bits.shape[-1] - 1, -1, -1))
 
 
+def modulate_and_transmit(bits:ndarray, H:ndarray, nbps:int, SNR:int) -> Tuple[ndarray, ndarray]:
+    mapper = get_mapper(nbps)
+    b = tf.convert_to_tensor(bits, dtype=tf.int32)
+    x: ndarray = mapper(b).cpu().numpy()
+
+    # SNR(dB) := 10*log10(P_signal/P_noise) ?= Var(signal) / Var(noise)
+    sigma = np.var(bits) / SNR
+    noise = np.random.normal(scale=sigma**0.5, size=x.shape)
+    y = H @ x + noise
+    return x, y
+
+
 def test_data_gen(idx:int):
     fp = f'MLD_data/{idx}.pickle'
     with open(fp, 'rb') as fh:
@@ -32,16 +44,9 @@ def test_data_gen(idx:int):
     print('SNR:', SNR)
     print('ZF_ber:', ZF_ber)
 
-    mapper = get_mapper(nbps)
-    b = tf.convert_to_tensor(bits, dtype=tf.int32)
-    x: ndarray = mapper(b).cpu().numpy()
     color = bits_to_number(bits)
+    x, y_hat = modulate_and_transmit(bits, H, nbps, SNR)
 
-    # SNR(dB) := 10*log10(P_signal/P_noise) ?= Var(signal) / Var(noise)
-    sigma = np.var(b) / SNR
-    noise = np.random.normal(scale=sigma**0.5, size=x.shape)
-    y_hat = H @ x + noise
-    
     # 0. perfect recon, when noise is known (impossible)
     #x_hat = np.linalg.inv(H) @ (y_hat - noise)
     # 1. ZF-method (seemingly ok in cases)

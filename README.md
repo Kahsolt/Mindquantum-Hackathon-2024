@@ -10,6 +10,8 @@ Team Name: Quiscus
 
 ### Quickstart
 
+⚠ Online judge uses `python==3.7`, mind your grammar suger syntax please :(
+
 ⚪ install
 
 - `conda create -n q python==3.9 && conda activate q`

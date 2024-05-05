@@ -74,7 +74,7 @@ def run(args):
         y = tf.convert_to_tensor(y.T)                   # [B=1, Nr]
         # WTF: noise covariance matrice, how to get this?
         if 'use identity':
-            cov = np.eye(Nt, dtype=np.complex64)
+            cov = np.eye(Nt, dtype=np.complex64)    # *sigma (?
         else:
             sigma = np.var(bits) / SNR
             noise = np.random.normal(scale=sigma**0.5, size=H[0].shape).astype(np.complex64)
