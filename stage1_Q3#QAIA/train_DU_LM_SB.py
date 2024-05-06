@@ -22,7 +22,7 @@ import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 
-from vis_data_gen import modulate_and_transmit
+from run_baseline import modulate_and_transmit
 
 torch.backends.cudnn.enabled = False
 torch.backends.cudnn.benchmark = False

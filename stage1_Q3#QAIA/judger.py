@@ -4,7 +4,10 @@ from glob import glob
 
 import numpy as np
 from numpy import ndarray
+import matplotlib.pyplot as plt
 from tqdm import tqdm
+
+from train_DU_LM_SB import LOG_PATH
 
 
 def compute_ber(solution:ndarray, bits:ndarray) -> float:
@@ -94,6 +97,8 @@ class Judger:
 
     def benchmark(self, ising_gen, qaia_mld_solver):
         from collections import defaultdict
+        ber_list = []
+        ZF_ber_list = []
         avgber_per_Nt = defaultdict(list)
         avgber_per_snr = defaultdict(list)
         avgber_per_nbps = defaultdict(list)
@@ -104,8 +109,10 @@ class Judger:
             bits_decode = self.infer(ising_gen, qaia_mld_solver, H, y, num_bits_per_symbol, snr)
             ber = compute_ber(bits_decode, bits_truth)
             avgber += ber
-            print(f'[case {i}] ans: {ber}, ref: {ZF_ber}')
+            print(f'[case {i}] ber: {ber}, ref_ber: {ZF_ber}')
 
+            ber_list.append(ber)
+            ZF_ber_list.append(ZF_ber)
             avgber_per_Nt[H.shape[1]].append(ber)
             avgber_per_snr[snr].append(ber)
             avgber_per_nbps[num_bits_per_symbol].append(ber)
@@ -119,6 +126,15 @@ class Judger:
         print('>> avgber_per_nbps:')
         for nbps in sorted(avgber_per_nbps):
             print(f'  {nbps}: {np.asarray(avgber_per_nbps[nbps]).mean()}')
+
+        if 'plot':
+            plt.plot(ber_list,    label='ours')
+            plt.plot(ZF_ber_list, label='ZF')
+            plt.legend()
+            plt.suptitle('BER')
+            plt.tight_layout()
+            plt.savefig(LOG_PATH / 'solut.png', dpi=400)
+            plt.close()
 
         avgber /= len(self.test_cases)
         return avgber

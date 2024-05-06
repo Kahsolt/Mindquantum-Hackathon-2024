@@ -20,6 +20,9 @@ constellation_cache: Dict[int, Constellation] = {}
 mapper_cache: Dict[int, Mapper] = {}
 detector_cache: Dict[int, Callable] = {}
 
+# https://stackoverflow.com/questions/15505514/binary-numpy-array-to-list-of-integers
+bits_to_number = lambda bits: bits.dot(1 << np.arange(bits.shape[-1] - 1, -1, -1))
+
 mean = lambda x: sum(x) / len(x) if len(x) else 0.0
 
 
@@ -55,6 +58,18 @@ def get_detector(args, nbps:int, Nt:int):
         }
         detector_cache[cfg] = detector_cls[args.M]()
     return detector_cache[cfg]
+
+
+def modulate_and_transmit(bits:ndarray, H:ndarray, nbps:int, SNR:int) -> Tuple[ndarray, ndarray]:
+    mapper = get_mapper(nbps)
+    b = tf.convert_to_tensor(bits, dtype=tf.int32)
+    x: ndarray = mapper(b).cpu().numpy()
+
+    # SNR(dB) := 10*log10(P_signal/P_noise) ?= Var(signal) / Var(noise)
+    sigma = np.var(bits) / SNR
+    noise = np.random.normal(scale=sigma**0.5, size=x.shape)
+    y = H @ x + noise
+    return x, y
 
 
 def run(args):
