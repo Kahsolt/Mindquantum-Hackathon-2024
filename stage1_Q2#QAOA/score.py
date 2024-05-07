@@ -50,11 +50,18 @@ def score():
         score += single_score(Jc_dict)
     
     fps = []
-    for propotion in [0.3, 0.9]:
-        for k in range(2, 5):
-            for coef in ['std', 'uni', 'bimodal']:
-                for r in range(5):
-                    fps.append(f"data/k{k}/{coef}_p{propotion}_{r}.json")
+    if 'original':
+        for propotion in [0.3, 0.9]:
+            for k in range(2, 5):
+                for coef in ['std', 'uni', 'bimodal']:
+                    for r in range(5):
+                        fps.append(f"data/k{k}/{coef}_p{propotion}_{r}.json")
+    else:   # full dataset
+        for propotion in [0.3, 0.6, 0.9]:
+            for k in range(2, 6):
+                for coef in ['std', 'uni', 'bimodal']:
+                    for r in range(10):
+                        fps.append(f"data/k{k}/{coef}_p{propotion}_{r}.json")
     for fp in tqdm(fps):
         Jc_dict = load_data(fp)
         score += single_score(Jc_dict)

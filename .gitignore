@@ -11,9 +11,3 @@ thesis/*
 
 # tmpl & submit
 *.zip
-
-# logs
-out/
-log/
-*.log
-*.hdf5

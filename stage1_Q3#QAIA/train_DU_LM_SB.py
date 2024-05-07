@@ -175,6 +175,7 @@ def train(args):
   ''' Data '''
   dataset = []
   for idx in tqdm(range(150)):
+    if idx > args.limit > 0: break
     with open(f'MLD_data/{idx}.pickle', 'rb') as fh:
       data = pkl.load(fh)
       H = data['H']
@@ -203,7 +204,7 @@ def train(args):
   model.train()
   try:
     for steps in tqdm(range(init_step, args.steps)):
-      if steps % len(dataset) == 0:
+      if not args.no_shuffle and steps % len(dataset) == 0:
         random.shuffle(dataset)
       sample = dataset[steps % len(dataset)]
 
@@ -267,7 +268,10 @@ if __name__ == '__main__':
   parser.add_argument('--steps', default=3000, type=int)
   parser.add_argument('--lr', default=1e-2, type=float)
   parser.add_argument('--load', help='ckpt to resume')
+  parser.add_argument('-L', '--limit', default=-1, type=int, help='limit dataset n_sample')
   parser.add_argument('--overfit', action='store_true', help='overfit to given dataset')
+  parser.add_argument('--no_shuffle', action='store_true', help='no shuffle dataset')
+  parser.add_argument('--log_every', default=50, type=int)
   args = parser.parse_args()
 
   if args.overfit:

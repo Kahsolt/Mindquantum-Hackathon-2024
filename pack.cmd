@@ -28,6 +28,7 @@ IF EXIST %TGT%.zip DEL %TGT%.zip
 7z u %TGT%.zip ^
   %SRC%\data\* ^
   %SRC%\utils\* ^
+  %SRC%\log\* ^
   %SRC%\score.py ^
   %SRC%\README.md ^
   %SRC%\main.py
