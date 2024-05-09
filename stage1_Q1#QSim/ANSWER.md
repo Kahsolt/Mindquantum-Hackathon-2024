@@ -13,9 +13,17 @@
   - 评分: L1_err↓, n_shots↓
   - 限时: 2h
 - 考点
-  - pauli grouping/trimming (测量尽可能少的pauli串，平衡coeff数值精度)
-  - light-weight ansatz design (用尽可能少的门)
-  - error mitigate (去除空线路噪声/ZNE/多测几次取最低)
+  - pauli grouping/trimming
+    - 删减，尽可能少测几个pauli串
+    - 分组，尽可能少测几次
+    - 不同coeff的项测不同次数，以平衡coeff数值精度
+    - X/Y轴投影测量会引入额外旋转门，可以想办法用Z轴投影去估算
+  - light-weight ansatz design
+    - 可能少的门，尽可能浅的线路
+  - error mitigate
+    - 去除空线路噪声
+    - ZNE
+    - 多测几次取最低
 
 ### solution
 
@@ -27,13 +35,12 @@
 
 > truth $ E_{fci} $: -2.1663874486347625 for the default H4 1-2-3-4
 
-| method | score↑ | energy↓ | shots↓ | time | comment |
+| method | score↑ (clean/noisy) | energy↓ (clean/noisy) | time (clean/noisy) | comment |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| UCC |  0.290 | -0.29369 | 18400 | 324.23 | baseline |
-| UCC |  0.300 | -0.31272 | 18000 | 314.37 | trim coeff < 1e-3 |
-| UCC |  1.035 | -0.37762 |  5400 | 284.07 | trim coeff < 1e-3, shot=30 (随机性很大) |
-| UCC |  3.888 | -0.59817 |  1640 | 251.29 | trim coeff < 1e-2, shot=10 (随机性很大) |
-| UCC | 22.612 | -0.15622 |   220 |  35.40 | trim coeff < 1e-1, shot=10 (随机性很大) |
+| UCC |  47.484/0.609 | -2.14533/-0.52303 | 54.19/306.66 | baseline, init=zeros, shots=100 |
+| UCC |  49.446/0.580 | -2.18661/-0.44119 | 57.59/635.20 | baseline, init=zeros, shots=1000 |
+| UCC | 180.318/0.538 | -2.16084/-0.30754 | 55.81/307.34 | trim coeff < 1e-3 (184->180) |
+| UCC |  22.286/0.596 | -2.12152/-0.48931 | 51.42/272.67 | trim coeff < 1e-2 (184->164) |
 
 ⚪ submits
 
@@ -43,10 +50,15 @@
 | 2024-05-02 23:20:24 | 1.334 | 0.574  | ry_HEA, trim coeff < 1e-3, shots=100 |
 | 2024-05-02 23:28:58 | 2.360 | 0.7994 | HF, trim coeff < 1e-3, shots=100 |
 | 2024-05-05 23:15:30 | 2.360 | 1.0077 | HF, trim coeff < 1e-3, shots=100 |
+| 2024-05-09 17:57:33 | 5.512 | 5.9368 | HF, trim coeff < 1e-3, shots=100, n_meas=10 |
+| 2024-05-09 19:28:05 | 3.908 | 3.826  | ry_HEA, trim coeff < 1e-3, shots=100, n_meas=10 |
+| 2024-05-09 19:28:05 | 4.519 | 4.2442 | ry_HEA_no_HF, trim coeff < 1e-3, shots=100, n_meas=10 |
 
 ### reference
 
 - solution from Tencent Quantum Lab: [https://github.com/liwt31/QC-Contest-Demo](https://github.com/liwt31/QC-Contest-Demo)
+- mindquantum#error_mitigation: [https://gitee.com/mindspore/mindquantum/tree/error_mitigation/](https://gitee.com/mindspore/mindquantum/tree/error_mitigation/)
+- mitiq: [https://mitiq.readthedocs.io/en/stable/](https://mitiq.readthedocs.io/en/stable/)
 
 ----
 by Armit

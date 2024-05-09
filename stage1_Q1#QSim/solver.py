@@ -38,7 +38,7 @@ class Solver:
         print(f"time: {self.execution_time:.2f}")   # <= 2 hours
         print(f"energy: {E:.5f}")
         print(f"fci: {E_fci}")                      # -2.166387448634759 for the sample case
-        score = 10000 / (abs(E - E_fci) * n_shots)  # score function
+        score = 1 / abs(E - E_fci)                  # score function
         print(f">> score: {score:.3f}")
 
     def run(self, method, molecule):

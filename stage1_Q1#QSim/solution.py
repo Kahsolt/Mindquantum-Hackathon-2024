@@ -97,9 +97,7 @@ def norm_p(x:ndarray) -> ndarray:
     x = x % (2*np.pi)       # [0, 2*pi]
     return np.where(x < np.pi, x, x - 2*np.pi)
 
-def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', tol:float=1e-8, init:str='randu') -> ParameterResolver:
-    if not len(circ.params_name): return
-
+def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', tol:float=1e-8, init:str='randu') -> Tuple[float, ParameterResolver]:
     # tricks
     TRIM_P = 1e-5   # 1e-9
     NORM_P = True   # True
@@ -125,17 +123,20 @@ def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', tol:flo
 
     sim = Simulator('mqvector', circ.n_qubits)
     grad_ops = sim.get_expectation_with_grad(Hamiltonian(ham), circ)
-    res = minimize(func, p0, (grad_ops,), method, jac=True, tol=tol, options={'maxiter':1000, 'disp':True})
+    options = {'maxiter':1000, 'disp':False}
+    if method == 'COBYLA':
+        options.update({'rhobeg': 1.57})
+    res = minimize(func, p0, (grad_ops,), method, jac=True, tol=tol, options=options)
     print('min. fval:', res.fun)
-    print('argmin. x:', res.x)
+    #print('argmin. x:', res.x)
     px = res.x
     if TRIM_P:
         px = trim_p(px, TRIM_P)
-        print('argmin. x (trimmed):', px)
+        #print('argmin. x (trimmed):', px)
     if NORM_P:
         px = norm_p(px)
-        print('argmin. x (normed):', px)
-    return ParameterResolver(dict(zip(circ.params_name, px)))
+        #print('argmin. x (normed):', px)
+    return res.fun, ParameterResolver(dict(zip(circ.params_name, px)))
 
 
 ''' Measure '''
@@ -188,10 +189,19 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
 
     ''' Circuit & Params '''
     circ = get_HF_circuit(mol)
+    #circ = get_ry_HEA_circit(mol)
+    #circ = get_ry_HEA_circit_no_hf(mol)
     print('[circ]')
     print('   n_qubits:', circ.n_qubits)
     print('   n_params:', len(circ.params_name))
-    pr = get_best_params(circ, ham, method='BFGS', init='randu')
+    fmin = 99999
+    pr = None
+    if len(circ.params_name):
+        for _ in range(100):
+            fval, pr_new = get_best_params(circ, ham, method='BFGS', init='randu')
+            if fval < fmin:
+                fmin = fval
+                pr = pr_new
     circ, pr = prune_circuit(circ, pr)
 
     ''' Simulator '''
@@ -205,9 +215,12 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
 
     ''' Measure '''
     shots = 100
-    result = const
-    with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
-        for idx, (coeff, ops) in enumerate(split_ham):
-            result += measure_single_ham(sim, circ, pr, ops, shots) * coeff
-            bar.update_loop(idx)
-    return result
+    result_min = 9999
+    for _ in range(10):
+        result = const
+        with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
+            for idx, (coeff, ops) in enumerate(split_ham):
+                result += measure_single_ham(sim, circ, pr, ops, shots) * coeff
+                bar.update_loop(idx)
+        result_min = min(result_min, result)
+    return result_min
