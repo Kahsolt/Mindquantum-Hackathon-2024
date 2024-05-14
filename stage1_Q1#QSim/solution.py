@@ -61,7 +61,7 @@ def get_ry_HEA_circit_no_hf(mol, depth:int=1) -> Circuit:
 def get_ry_HEA_circit(mol, depth:int=1) -> Circuit:
     ''' impl from https://github.com/liwt31/QC-Contest-Demo '''
 
-    return get_HF_circuit(mol) + get_ry_HEA_circit_no_hf(mol, depth)
+    return get_ry_HEA_circit_no_hf(mol, depth) + get_HF_circuit(mol)
 
 
 def prune_circuit(circ:Circuit, pr:ParameterResolver) -> Tuple[Circuit, ParameterResolver]:
@@ -82,9 +82,18 @@ def split_hamiltonian(ham: QubitOperator) -> Tuple[float, List[PauliTerm]]:
     return const, split_ham
 
 def prune_hamiltonian(split_ham:List[PauliTerm]) -> List[PauliTerm]:
-    # 相同coeff的项，无论测哪个qubit，exp都一样？？
-    split_ham.sort(key=lambda it: abs(it[0]), reverse=True)
+    from mindquantum._math.ops import QubitOperator as QubitOperator_
+
+    def filter_Z_only(ops:QubitOperator) -> bool:
+        for term in QubitOperator_.get_terms(ops):
+            for qubit, symbol in term[0]:
+                if symbol.name in ['X', 'Y']:
+                    return False
+        return True
+
+    split_ham = [it for it in split_ham if filter_Z_only(it[1])]
     split_ham = [it for it in split_ham if abs(it[0]) > 1e-3]
+    split_ham.sort(key=lambda it: abs(it[0]), reverse=True)
     return split_ham
 
 
@@ -212,15 +221,21 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     if not isinstance(sim, Simulator):
         exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr).real
         print('exp (full ham):', exp)
+        print('exp (per-term):')
+        for idx, (coeff, ops) in enumerate(split_ham):
+            exp = sim.get_expectation(Hamiltonian(ops), circ, pr=pr).real
+            print('coeff=', coeff, 'term=', ops, 'exp=', exp)
 
     ''' Measure '''
-    shots = 100
+    shots = 10
     result_min = 9999
     for _ in range(10):
         result = const
         with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
             for idx, (coeff, ops) in enumerate(split_ham):
-                result += measure_single_ham(sim, circ, pr, ops, shots) * coeff
+                exp = measure_single_ham(sim, circ, pr, ops, shots)
+                #print('coeff=', coeff, 'term=', ops, 'exp=', exp)
+                result += exp * coeff
                 bar.update_loop(idx)
         result_min = min(result_min, result)
     return result_min

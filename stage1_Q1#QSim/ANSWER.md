@@ -36,7 +36,7 @@
 > truth $ E_{fci} $: -2.1663874486347625 for the default H4 1-2-3-4
 
 | method | score↑ (clean/noisy) | energy↓ (clean/noisy) | time (clean/noisy) | comment |
-| :-: | :-: | :-: | :-: | :-: | :-: |
+| :-: | :-: | :-: | :-: | :-: |
 | UCC |  47.484/0.609 | -2.14533/-0.52303 | 54.19/306.66 | baseline, init=zeros, shots=100 |
 | UCC |  49.446/0.580 | -2.18661/-0.44119 | 57.59/635.20 | baseline, init=zeros, shots=1000 |
 | UCC | 180.318/0.538 | -2.16084/-0.30754 | 55.81/307.34 | trim coeff < 1e-3 (184->180) |
@@ -53,12 +53,15 @@
 | 2024-05-09 17:57:33 | 5.512 | 5.9368 | HF, trim coeff < 1e-3, shots=100, n_meas=10 |
 | 2024-05-09 19:28:05 | 3.908 | 3.826  | ry_HEA, trim coeff < 1e-3, shots=100, n_meas=10 |
 | 2024-05-09 19:28:05 | 4.519 | 4.2442 | ry_HEA_no_HF, trim coeff < 1e-3, shots=100, n_meas=10 |
+| 2024-05-14 13:09:50 | ? | 27.9413 | HF, Z_only, shots=10, n_meas=10 |
 
 ### reference
 
 - solution from Tencent Quantum Lab: [https://github.com/liwt31/QC-Contest-Demo](https://github.com/liwt31/QC-Contest-Demo)
 - mindquantum#error_mitigation: [https://gitee.com/mindspore/mindquantum/tree/error_mitigation/](https://gitee.com/mindspore/mindquantum/tree/error_mitigation/)
 - mitiq: [https://mitiq.readthedocs.io/en/stable/](https://mitiq.readthedocs.io/en/stable/)
+- Jordan–Wigner transformation: [https://en.wikipedia.org/wiki/Jordan%E2%80%93Wigner_transformation](https://en.wikipedia.org/wiki/Jordan%E2%80%93Wigner_transformation)
+ - [https://futureofmatter.com/assets/fermions_and_jordan_wigner.pdf](https://futureofmatter.com/assets/fermions_and_jordan_wigner.pdf)
 
 ----
 by Armit
