@@ -18,6 +18,7 @@
     - 分组，尽可能少测几次
     - 不同coeff的项测不同次数，以平衡coeff数值精度
     - X/Y轴投影测量会引入额外旋转门，可以想办法用Z轴投影去估算
+      - 若用最基础的HF态线路，则只需测含Z的pauli串、且使用FIX_EXP，因为线路只含X门 (baseline)
   - light-weight ansatz design
     - 可能少的门，尽可能浅的线路
   - error mitigate
@@ -53,7 +54,8 @@
 | 2024-05-09 17:57:33 | 5.512 | 5.9368 | HF, trim coeff < 1e-3, shots=100, n_meas=10 |
 | 2024-05-09 19:28:05 | 3.908 | 3.826  | ry_HEA, trim coeff < 1e-3, shots=100, n_meas=10 |
 | 2024-05-09 19:28:05 | 4.519 | 4.2442 | ry_HEA_no_HF, trim coeff < 1e-3, shots=100, n_meas=10 |
-| 2024-05-14 13:09:50 | ? | 27.9413 | HF, Z_only, shots=10, n_meas=10 |
+| 2024-05-14 13:09:50 | 6~63 (方差很大) | 27.9413 (刷出来最高分) | HF, Z_only, shots=10, n_meas=10 |
+| 2024-05-15 23:02:32 | 14.740 (非常固定) | 15.4219 | HF, Z_only (+exp_fix), shots=100 (**exactly $E_{HF}$**) |
 
 ### reference
 

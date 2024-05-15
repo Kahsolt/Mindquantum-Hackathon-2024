@@ -18,7 +18,7 @@ from scipy.optimize import minimize
 
 from mindquantum.simulator import Simulator
 from mindquantum.core.operators import QubitOperator, Hamiltonian, TimeEvolution
-from mindquantum.core.gates import X, RY, CNOT, MeasureResult
+from mindquantum.core.gates import H, X, Y, RX, RY, CNOT, MeasureResult
 from mindquantum.core.circuit import Circuit, UN
 from mindquantum.core.parameterresolver import ParameterResolver
 from mindquantum.algorithm.nisq import Transform
@@ -42,6 +42,16 @@ def get_uccsd_circuit(mol) -> Circuit:
     ucc = Transform(uccsd_singlet_generator(mol.n_qubits, mol.n_electrons)).jordan_wigner().imag
     ucc = TimeEvolution(ucc).circuit
     return get_HF_circuit(mol) + ucc
+
+def get_wtf_circit(mol) -> Circuit:
+    circ = Circuit()
+    for i in range(mol.n_qubits):
+        circ += RY(f'd0_q{i}').on(i)
+        if i < mol.n_electrons:
+            circ += CNOT.on(i + mol.n_electrons, i)
+    for i in range(mol.n_electrons):
+        circ += RX(f'X_q{i}').on(i)
+    return circ
 
 def get_ry_HEA_circit_no_hf(mol, depth:int=1) -> Circuit:
     ''' impl from https://github.com/liwt31/QC-Contest-Demo '''
@@ -80,6 +90,17 @@ def split_hamiltonian(ham: QubitOperator) -> Tuple[float, List[PauliTerm]]:
         else:
             split_ham.append([pr.const.real, ops])
     return const, split_ham
+
+def combine_hamiltonian(const: float, terms: List[PauliTerm]) -> QubitOperator:
+    from re import compile as Regex
+    R_str = Regex('\[([XYZ\d ]+)\]')
+
+    ham = QubitOperator('', const)
+    for coeff, ops in terms:
+        coeff_string = str(ops)
+        string = R_str.findall(coeff_string)[0]
+        ham += QubitOperator(string, coeff)
+    return ham
 
 def prune_hamiltonian(split_ham:List[PauliTerm]) -> List[PauliTerm]:
     from mindquantum._math.ops import QubitOperator as QubitOperator_
@@ -169,6 +190,25 @@ def measure_single_ham(sim: Simulator, circ: Circuit, pr: ParameterResolver, ops
         exp += (-1)**bits.count('1') * cnt
     return exp / shots
 
+def get_min_exp(sim:Simulator, circ:Circuit, pr:ParameterResolver, split_ham:List[PauliTerm], shots:int=100, n_repeat:int=10, use_exp_fix:bool=False) -> float:
+    result_min = 99999
+    for _ in range(n_repeat):
+        result = 0.0
+        with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
+            for idx, (coeff, ops) in enumerate(split_ham):
+                exp = measure_single_ham(sim, circ, pr, ops, shots)
+                if use_exp_fix:
+                    # FIXME: when circ is non-entangled, and gates are all X
+                    # the BitFlip noise on measure gate could be cheaty moved out :)
+                    if   exp > 0: exp = +1
+                    elif exp < 0: exp = -1
+                #print('coeff=', coeff, 'term=', ops, 'exp=', exp)
+                result += exp * coeff
+                bar.update_loop(idx)
+        print(result)
+        result_min = min(result_min, result)
+    return result_min
+
 
 ''' Entry '''
 
@@ -193,25 +233,30 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     print('[ham]')
     print('  const:', const)
     print('  n_terms:', len(split_ham))
-    split_ham = prune_hamiltonian(split_ham)
+    #split_ham = prune_hamiltonian(split_ham)
     print('  n_terms (pruned):', len(split_ham))
+    ham = combine_hamiltonian(const, split_ham)
 
     ''' Circuit & Params '''
-    circ = get_HF_circuit(mol)
-    #circ = get_ry_HEA_circit(mol)
-    #circ = get_ry_HEA_circit_no_hf(mol)
+    #circ = get_HF_circuit(mol)
+    #circ = get_wtf_circit(mol)
+    circ = get_ry_HEA_circit(mol, 3)
+    #circ = get_uccsd_circuit(mol)
     print('[circ]')
     print('   n_qubits:', circ.n_qubits)
     print('   n_params:', len(circ.params_name))
+    print(circ)
     fmin = 99999
     pr = None
     if len(circ.params_name):
-        for _ in range(100):
+        for _ in range(10):
             fval, pr_new = get_best_params(circ, ham, method='BFGS', init='randu')
             if fval < fmin:
                 fmin = fval
                 pr = pr_new
     circ, pr = prune_circuit(circ, pr)
+    print('[params]:', repr(pr))
+    pr_empty = ParameterResolver(dict(zip(circ.params_name, np.zeros(len(circ.params_name))))) if pr is not None else None
 
     ''' Simulator '''
     from mindquantum.simulator import Simulator as OriginalSimulator
@@ -219,23 +264,29 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     sim = Simulator('mqvector', mol.n_qubits)
 
     if not isinstance(sim, Simulator):
+        sim: OriginalSimulator
         exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr).real
         print('exp (full ham):', exp)
+        if pr_empty is not None:
+            exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr_empty).real
+            print('exp (full ham, zero param):', exp)
         print('exp (per-term):')
         for idx, (coeff, ops) in enumerate(split_ham):
             exp = sim.get_expectation(Hamiltonian(ops), circ, pr=pr).real
             print('coeff=', coeff, 'term=', ops, 'exp=', exp)
 
     ''' Measure '''
-    shots = 10
-    result_min = 9999
-    for _ in range(10):
-        result = const
-        with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
-            for idx, (coeff, ops) in enumerate(split_ham):
-                exp = measure_single_ham(sim, circ, pr, ops, shots)
-                #print('coeff=', coeff, 'term=', ops, 'exp=', exp)
-                result += exp * coeff
-                bar.update_loop(idx)
-        result_min = min(result_min, result)
-    return result_min
+    SHOTS = 1000
+    USE_EXP_FIX = False
+    N_MEAS = 1 if USE_EXP_FIX else 1
+
+    if pr_empty is not None:
+        result_ref = const + get_min_exp(sim, circ, pr_empty, split_ham, shots=SHOTS, n_repeat=N_MEAS, use_exp_fix=USE_EXP_FIX)
+        print('result_ref:', result_ref)
+    else:
+        result_ref = mol.hf_energy
+
+    result_vqc = const + get_min_exp(sim, circ, pr, split_ham, shots=SHOTS, n_repeat=N_MEAS, use_exp_fix=USE_EXP_FIX)
+    
+    # Reference state error mitigation from https://pubs.acs.org/doi/10.1021/acs.jctc.2c00807
+    return result_vqc + (mol.hf_energy - result_ref)
