@@ -18,12 +18,15 @@ from scipy.optimize import minimize
 
 from mindquantum.simulator import Simulator
 from mindquantum.core.operators import QubitOperator, Hamiltonian, TimeEvolution
-from mindquantum.core.gates import H, X, Y, RX, RY, CNOT, MeasureResult
+from mindquantum.core.gates import H, X, Y, Z, RX, RY, RZ, CNOT, BasicGate, ParameterGate, MeasureResult
 from mindquantum.core.circuit import Circuit, UN
 from mindquantum.core.parameterresolver import ParameterResolver
 from mindquantum.algorithm.nisq import Transform
 from mindquantum.utils.progress import SingleLoopProgress
 from mindquantum.third_party.unitary_cc import uccsd_singlet_generator
+from mindquantum.framework import MQAnsatzOnlyLayer
+from mindspore.nn.optim import SGD, Adam
+from mindspore.nn.wrap.cell_wrapper import TrainOneStepCell
 
 from simulator import HKSSimulator
 from utils import generate_molecule, get_molecular_hamiltonian
@@ -43,14 +46,13 @@ def get_uccsd_circuit(mol) -> Circuit:
     ucc = TimeEvolution(ucc).circuit
     return get_HF_circuit(mol) + ucc
 
-def get_wtf_circit(mol) -> Circuit:
+def get_wtf_circit(mol, depth:int=2) -> Circuit:
     circ = Circuit()
-    for i in range(mol.n_qubits):
-        circ += RY(f'd0_q{i}').on(i)
-        if i < mol.n_electrons:
-            circ += CNOT.on(i + mol.n_electrons, i)
-    for i in range(mol.n_electrons):
-        circ += RX(f'X_q{i}').on(i)
+    for d in range(depth):
+        for i in range(mol.n_qubits):
+            circ += RY(f'd{d}_q{i}').on(i)
+        for i in range(mol.n_qubits):
+            circ += CNOT.on((mol.n_qubits + mol.n_electrons + i - 1) % mol.n_qubits, i)
     return circ
 
 def get_ry_HEA_circit_no_hf(mol, depth:int=1) -> Circuit:
@@ -76,7 +78,30 @@ def get_ry_HEA_circit(mol, depth:int=1) -> Circuit:
 
 def prune_circuit(circ:Circuit, pr:ParameterResolver) -> Tuple[Circuit, ParameterResolver]:
     # TODO: circuit prune: removing 2*pi rotation gate, round pi fractions to non-parameter gate
-    return circ, pr
+    # sanitize
+    to_keep: List[BasicGate] = []
+    to_remove_keys: List[str] = [k for k in pr.keys() if abs(pr[k]) < 1e-6]
+    for gate in circ:
+        gate: BasicGate
+        if not gate.parameterized:
+            to_keep.append(gate)
+        else:
+            gate: ParameterGate
+            to_remove = False
+            for gate_pr in gate.get_parameters():
+                for key in gate_pr.keys():
+                    if key in to_remove_keys:
+                        to_remove = True
+                        break
+                if to_remove: break
+            if not to_remove:
+                to_keep.append(gate)
+    # rebuild
+    circ_new = Circuit()
+    for gate in to_keep:
+        circ_new += gate
+    pr_new = ParameterResolver({k: pr[k] for k in circ_new.params_name})
+    return circ_new, pr_new
 
 
 ''' Hamiltonian '''
@@ -112,8 +137,8 @@ def prune_hamiltonian(split_ham:List[PauliTerm]) -> List[PauliTerm]:
                     return False
         return True
 
-    split_ham = [it for it in split_ham if filter_Z_only(it[1])]
-    split_ham = [it for it in split_ham if abs(it[0]) > 1e-3]
+    #split_ham = [it for it in split_ham if filter_Z_only(it[1])]
+    split_ham = [it for it in split_ham if abs(it[0]) > 1e-2]
     split_ham.sort(key=lambda it: abs(it[0]), reverse=True)
     return split_ham
 
@@ -127,7 +152,7 @@ def norm_p(x:ndarray) -> ndarray:
     x = x % (2*np.pi)       # [0, 2*pi]
     return np.where(x < np.pi, x, x - 2*np.pi)
 
-def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', tol:float=1e-8, init:str='randu') -> Tuple[float, ParameterResolver]:
+def optim_sp(method:str, circ:Circuit, ham:Hamiltonian, p0:ndarray, tol:float=1e-8):
     # tricks
     TRIM_P = 1e-5   # 1e-9
     NORM_P = True   # True
@@ -142,21 +167,16 @@ def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', tol:flo
         g = g.real[0, 0]
         return f, g
 
-    if init == 'zeros':
-        p0 = np.zeros(len(circ.params_name))
-    elif init == 'randu':
-        p0 = np.random.uniform(-np.pi, np.pi, len(circ.params_name))
-    elif init == 'randn':
-        p0 = np.random.normal(0, 0.02, len(circ.params_name))
     if TRIM_P: p0 = trim_p(p0, TRIM_P)
     if NORM_P: p0 = norm_p(p0)
 
     sim = Simulator('mqvector', circ.n_qubits)
-    grad_ops = sim.get_expectation_with_grad(Hamiltonian(ham), circ)
+    grad_ops = sim.get_expectation_with_grad(ham, circ)
     options = {'maxiter':1000, 'disp':False}
     if method == 'COBYLA':
         options.update({'rhobeg': 1.57})
     res = minimize(func, p0, (grad_ops,), method, jac=True, tol=tol, options=options)
+
     print('min. fval:', res.fun)
     #print('argmin. x:', res.x)
     px = res.x
@@ -167,6 +187,52 @@ def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', tol:flo
         px = norm_p(px)
         #print('argmin. x (normed):', px)
     return res.fun, ParameterResolver(dict(zip(circ.params_name, px)))
+
+def optim_ms(method:str, circ: Circuit, ham:Hamiltonian, p0:ndarray):
+    ''' Model & Optim '''
+    sim = Simulator('mqvector', circ.n_qubits)
+    grad_ops = sim.get_expectation_with_grad(ham, circ)
+    net = MQAnsatzOnlyLayer(grad_ops)
+    net.weight.data[:] = p0.tolist()
+    if method == 'Adam':
+        opt = Adam(net.trainable_params(), learning_rate=0.01)
+    elif method == 'SGD':
+        opt = SGD(net.trainable_params(), learning_rate=0.01, momentum=0.8)
+    train_net = TrainOneStepCell(net, opt)
+    ''' Train '''
+    best_E = 99999
+    best_weight = None
+    for i in range(2000):
+        E = train_net()
+        if E < best_E:
+            best_E = E
+            best_weight = train_net.weights[0]
+        if i % 100 == 0:
+            print(f'[step {i}] expect: {E}')
+    px = best_weight
+
+    '''
+    px = [
+        -0.172711, 0.000000, 0.000000, -0.000000, 0.000000, 0.000000, 0.015735, -0.007540, -0.000000,
+        0.000000, 0.000000, -0.000000, -0.000000, -0.000001, 1.570925, 0.005027, -0.000000, 0.000000,
+        0.000081, 0.000000, 0.000000, 0.000054, 0.004083, 0.019818, 0.000000, -0.000007, -0.000000,
+        0.000000, 0.000000, 0.000256, -1.570796, 0.002514
+    ]
+    '''
+    return E, ParameterResolver(dict(zip(circ.params_name, px)))
+
+def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', init:str='randu') -> Tuple[float, ParameterResolver]:
+    if init == 'zeros':
+        p0 = np.zeros(len(circ.params_name))
+    elif init == 'randu':
+        p0 = np.random.uniform(-np.pi, np.pi, len(circ.params_name))
+    elif init == 'randn':
+        p0 = np.random.normal(0, 0.02, len(circ.params_name))
+
+    if method in ['BFGS', 'COBYLA']:
+        return optim_sp(method, circ, Hamiltonian(ham), p0)
+    else:
+        return optim_ms(method, circ, Hamiltonian(ham), p0)
 
 
 ''' Measure '''
@@ -205,7 +271,6 @@ def get_min_exp(sim:Simulator, circ:Circuit, pr:ParameterResolver, split_ham:Lis
                 #print('coeff=', coeff, 'term=', ops, 'exp=', exp)
                 result += exp * coeff
                 bar.update_loop(idx)
-        print(result)
         result_min = min(result_min, result)
     return result_min
 
@@ -244,17 +309,21 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     #circ = get_uccsd_circuit(mol)
     print('[circ]')
     print('   n_qubits:', circ.n_qubits)
+    print('   n_gates:', len(circ))
     print('   n_params:', len(circ.params_name))
     print(circ)
     fmin = 99999
     pr = None
     if len(circ.params_name):
         for _ in range(10):
-            fval, pr_new = get_best_params(circ, ham, method='BFGS', init='randu')
+            fval, pr_new = get_best_params(circ, ham, method='Adam', init='randn')
             if fval < fmin:
                 fmin = fval
                 pr = pr_new
-    circ, pr = prune_circuit(circ, pr)
+    #circ, pr = prune_circuit(circ, pr)
+    print('   n_gates (pruned):', len(circ))
+    print('   n_params (pruned):', len(circ.params_name))
+    print(circ)
     print('[params]:', repr(pr))
     pr_empty = ParameterResolver(dict(zip(circ.params_name, np.zeros(len(circ.params_name))))) if pr is not None else None
 
@@ -280,6 +349,25 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     USE_EXP_FIX = False
     N_MEAS = 1 if USE_EXP_FIX else 1
 
+    # best local case:
+    # E_ref: -1.7572561834789797
+    # E_vqc: -2.15495
+    # best_param: [
+    #     d0_q0: -0.172711,
+    #     d0_q6: 0.015735,
+    #     d0_q7: -0.007540,
+    #     d1_q5: -0.000001,
+    #     d1_q6: 1.570925,
+    #     d1_q7: 0.005027,
+    #     d2_q2: 0.000081,
+    #     d2_q5: 0.000054,
+    #     d2_q6: 0.004083,
+    #     d2_q7: 0.019818,
+    #     d3_q1: -0.000007,
+    #     d3_q5: 0.000256,
+    #     d3_q6: -1.570796,
+    #     d3_q7: 0.002514
+    # ]
     if pr_empty is not None:
         result_ref = const + get_min_exp(sim, circ, pr_empty, split_ham, shots=SHOTS, n_repeat=N_MEAS, use_exp_fix=USE_EXP_FIX)
         print('result_ref:', result_ref)
