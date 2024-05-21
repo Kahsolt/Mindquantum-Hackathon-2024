@@ -38,10 +38,12 @@ $$
 $$
 \text{BER} = \frac{|\mathbf{s}-\mathbf{\hat{s}}|}{2N_t\cdot\log_2|\Omega|}
 $$
-设各个实例BER算数平均值为$\overline{\text{BER}}$, 选手得分为
+设各个实例BER算数平均值为$\overline{\text{BER}}$, 选手得分公式大致为
 $$
-\text{score} = 1 - \overline{\text{BER}}.
+\text{score} = (1 - \overline{\text{BER}})\times\frac{\text{baseline\_time}}{\text{running\_time}}.
 $$
+
+$\text{baseline\_time}$ 为基线方法运行时间, $\text{running\_time}$为选手代码运行时间.
 
 ## 数据集
 

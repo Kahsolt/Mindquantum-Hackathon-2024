@@ -129,7 +129,7 @@ def to_ising_MDI_MIMO(H:ndarray, y:ndarray, nbps:int) -> J_h:
 
 
 def solver_qaia_lib(qaia_cls, J:ndarray, h:ndarray) -> ndarray:
-    solver: QAIA = qaia_cls(J, h, batch_size=100, n_iter=100)
+    solver: QAIA = qaia_cls(J, h, batch_size=1, n_iter=10)
     solver.update()
     sample = np.sign(solver.x)      # [rb*N, B]
     energy = solver.calc_energy()   # [1, B]
@@ -152,12 +152,22 @@ def solver_DU_LM_SB(J:ndarray, h:ndarray) -> ndarray:
     return solution
 
 
+run_cfg = 'LM_SB'
+
 # 选手提供的Ising模型生成函数，可以用我们提供的to_ising
 def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> J_h:
-    #return to_ising_LM_SB(H, y, nbps, lmbd=25)
-    return to_ising_DU_LM_SB(H, y, nbps)
+    if run_cfg == 'baseline':
+        return to_ising(H, y, nbps)
+    if run_cfg == 'LM_SB':
+        return to_ising_LM_SB(H, y, nbps, lmbd=25)
+    if run_cfg == 'DU_LM_SB':
+        return to_ising_DU_LM_SB(H, y, nbps)
 
 # 选手提供的qaia MLD求解器，用mindquantum.algorithms.qaia
 def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
-    #return solver_qaia_lib(BSB, J, h)
-    return solver_DU_LM_SB(J, h)
+    if run_cfg == 'baseline':
+        return solver_qaia_lib(BSB, J, h)
+    if run_cfg == 'LM_SB':
+        return solver_qaia_lib(BSB, J, h)
+    if run_cfg == 'DU_LM_SB':
+        return solver_DU_LM_SB(J, h)

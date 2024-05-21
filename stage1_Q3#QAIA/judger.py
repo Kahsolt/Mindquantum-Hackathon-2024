@@ -152,8 +152,11 @@ if __name__ == "__main__":
         dataset.append([data['H'], data['y'], data['bits'], data['num_bits_per_symbol'], data['SNR'], data['ZF_ber']])
 
     # 测试选手的平均ber，越低越好
+    ref_ts = 234.09     # BSB baseline (B=100, n_iter=100)
     judger = Judger(dataset)
     t = time()
     avgber = judger.benchmark(ising_generator, qaia_mld_solver)
-    print(f'>> time cost: {time() - t:.2f}')
+    ts = time() - t
+    print(f'>> time cost: {ts:.2f}')
     print(f">> avg. BER = {avgber:.5f}")
+    print(f'>> score:', (1 - avgber) * (ref_ts / ts))
