@@ -2,7 +2,6 @@ from typing import List
 
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import csr_matrix
 
 from .SB import BSB
 
@@ -27,23 +26,23 @@ class DUSB(BSB):
 
         # Eq. 6 and 12
         # from essay
-        #self.c_0: float = 2 * np.sqrt((self.N - 1) / csr_matrix.power(self.J, 2).sum())
+        #self.c_0: float = 2 * np.sqrt((self.N - 1) / np.power(self.J, 2).sum())
         # from qaia lib
-        self.c_0 = self.xi
-        self.a = self.p
+        self.c_0 = self.xi * self.η
+        self.a_neg = 1 - self.p
 
     def update(self):
         # Eq. 11 ~ 14, trainable parameters are $Δ_k$ (`dt`) and $η$
         for k, Δ_k in enumerate(self.Δ):
-            self.y = self.y + Δ_k * (-(1 - self.a[k]) * self.x + self.η * self.c_0 * (self.J @ self.x + self.h))
-            self.x = self.x + Δ_k * self.y
+            self.y += Δ_k * (-self.a_neg[k] * self.x + self.c_0 * (self.J @ self.x + self.h))
+            self.x += Δ_k * self.y
             self.x = φ_s(self.x)
-            self.y = self.y * (1 - ψ_s(self.x))
+            self.y *= 1 - ψ_s(self.x)
 
     def update_hard(self):
         for k, Δ_k in enumerate(self.Δ):
-            self.y = self.y + Δ_k * (-(1 - self.a[k]) * self.x + self.η * self.c_0 * (self.J @ self.x + self.h))
-            self.x = self.x + Δ_k * self.y
+            self.y += Δ_k * (-self.a_neg[k] * self.x + self.c_0 * (self.J @ self.x + self.h))
+            self.x += Δ_k * self.y
 
             cond = np.abs(self.x) > 1
             self.x = np.where(cond, np.sign(self.x), self.x)          # limit x to vrng [-1, +1]

@@ -15,7 +15,6 @@
 """Noisy Mean-field Annealing algorithm."""
 # pylint: disable=invalid-name
 import numpy as np
-from scipy.sparse import csr_matrix
 
 from .QAIA import QAIA
 
@@ -28,7 +27,7 @@ class NMFA(QAIA):
     algorithm <https://arxiv.org/abs/1806.08422>`_.
 
     Args:
-        J (Union[numpy.array, csr_matrix]): The coupling matrix with shape :math:`(N x N)`.
+        J (Union[numpy.array]): The coupling matrix with shape :math:`(N x N)`.
         h (numpy.array): The external field with shape :math:`(N, )`.
         x (numpy.array): The initialized spin value with shape :math:`(N x batch_size)`. Default: ``None``.
         n_iter (int): The number of iterations. Default: ``1000``.
@@ -50,11 +49,10 @@ class NMFA(QAIA):
     ):
         """Construct NMFA algorithm."""
         super().__init__(J, h, x, n_iter, batch_size)
-        self.J = csr_matrix(self.J)
         if self.h is None:
-            self.J_norm = np.sqrt(np.asarray(csr_matrix.power(self.J, 2).sum(axis=1)))
+            self.J_norm = np.sqrt(np.power(self.J, 2).sum(axis=1))
         else:
-            self.J_norm = np.sqrt(np.asarray(csr_matrix.power(self.J, 2).sum(axis=1)) + np.sum(self.h**2))
+            self.J_norm = np.sqrt(np.power(self.J, 2).sum(axis=1)) + np.sum(self.h**2)
 
         self.alpha = alpha
         self.sigma = sigma

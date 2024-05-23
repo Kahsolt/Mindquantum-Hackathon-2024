@@ -100,7 +100,6 @@ def to_ising(H:Tensor, y:Tensor, nbps:int, lmbd:Tensor) -> Tuple[Tensor, Tensor]
   N = 2 * Nt
   # n_bits/n_spins that one elem decodes to
   rb = nbps // 2
-
   # QAM variance for normalization
   qam_var = 2 * (M - 1) / 3
 
@@ -120,13 +119,14 @@ def to_ising(H:Tensor, y:Tensor, nbps:int, lmbd:Tensor) -> Tuple[Tensor, Tensor]
 
   # Eq. 10
   U_λ = torch.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd   # LMMSE-like part, with our fix
-  J = -T.T @ H_tilde.T @ U_λ @ H_tilde @ T * (2 / qam_var)
+  H_tilde_T = H_tilde @ T
+  J = -H_tilde_T.T @ U_λ @ H_tilde_T * (2 / qam_var)
   J = J * (1 - torch.eye(J.shape[0], device=H.device))    # mask diagonal to zeros
-  z = y_tilde / math.sqrt(qam_var) - H_tilde @ T @ torch.ones([N * rb, 1], device=H.device) / qam_var + (math.sqrt(M) - 1) * H_tilde @ torch.ones([N, 1], device=H.device) / qam_var
-  h = 2 * z.T @ U_λ.T @ H_tilde @ T
+  z = (y_tilde - H_tilde_T @ torch.ones([N * rb, 1], device=H.device) + (math.sqrt(M) - 1) * H_tilde @ torch.ones([N, 1], device=H.device)) / math.sqrt(qam_var)
+  h = 2 * H_tilde_T.T @ (U_λ @ z)
 
   # [rb*N, rb*N], [rb*N, 1]
-  return J, h.T
+  return J, h
 
 
 def ber_loss(spins:Tensor, bits:Tensor) -> Tensor:

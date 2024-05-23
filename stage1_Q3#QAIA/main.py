@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Dict
 
 import numpy as np
 from numpy import ndarray
@@ -21,6 +21,33 @@ try:
 except: pass
 
 J_h = Tuple[ndarray, ndarray]
+
+I_cache: Dict[int, ndarray] = {}
+def get_I(N:int) -> ndarray:
+    key = N
+    if key not in I_cache:
+        I_cache[key] = np.eye(N)
+    return I_cache[key]
+
+ones_cache: Dict[int, ndarray] = {}
+def get_ones(N:int) -> ndarray:
+    key = N
+    if key not in ones_cache:
+        ones_cache[key] = np.ones((N, 1))
+    return ones_cache[key]
+
+T_cache: Dict[Tuple[int, int], ndarray] = {}
+def get_T(N:int, rb:int) -> ndarray:
+    key = (N, rb)
+    if key not in T_cache:
+        # Eq. 7 the transform matrix T
+        I = get_I(N)
+        # [rb, N, N]
+        T = (2**(rb - 1 - np.arange(rb)))[:, np.newaxis, np.newaxis] * I[np.newaxis, ...]
+        # [rb*N, N] => [N, rb*N]
+        T = T.reshape(-1, N).T
+        T_cache[key] = T
+    return T_cache[key]
 
 
 def to_ising(H:ndarray, y:ndarray, nbps:int) -> J_h:
@@ -97,33 +124,31 @@ def to_ising_LM_SB(H:ndarray, y:ndarray, nbps:int, lmbd:int=25) -> J_h:
     N = 2 * Nt
     # n_bits/n_spins that one elem decodes to
     rb = nbps // 2
-
     # QAM variance for normalization
     qam_var = 2 * (M - 1) / 3
 
     # Eq. 7 the transform matrix T
-    I = np.eye(N)
-    # [rb, N, N]
-    T = (2**(rb - 1 - np.arange(rb)))[:, np.newaxis, np.newaxis] * I[np.newaxis, ...]
-    # [rb*N, N] => [N, rb*N]
-    T = T.reshape(-1, N).T
+    I = get_I(N)
+    T = get_T(N, rb)
 
     # Eq. 1
-    H_tilde = np.vstack([
-        np.hstack([H.real, -H.imag]), 
-        np.hstack([H.imag,  H.real]),
-    ])
+    H_tilde = np.empty([N, N], dtype=np.float32)
+    H_tilde[:Nt, :Nt] = H.real
+    H_tilde[:Nt, Nt:] = -H.imag
+    H_tilde[Nt:, :Nt] = H.imag
+    H_tilde[Nt:, Nt:] = H.real
     y_tilde = np.concatenate([y.real, y.imag])
 
     # Eq. 10
     U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd   # LMMSE-like part, with our fix
-    J = -T.T @ H_tilde.T @ U_λ @ H_tilde @ T * (2 / qam_var)
-    J[np.diag_indices_from(J)] = 0
-    z = y_tilde / np.sqrt(qam_var) - H_tilde @ T @ np.ones((N * rb, 1)) / qam_var + (np.sqrt(M) - 1) * H_tilde @ np.ones((N, 1)) / qam_var
-    h = 2 * z.T @ U_λ.T @ H_tilde @ T
+    H_tilde_T = H_tilde @ T
+    J = - H_tilde_T.T @ U_λ @ H_tilde_T * (2 / qam_var)
+    for j in range(J.shape[0]): J[j, j] = 0
+    z = (y_tilde - H_tilde @ (T @ get_ones(N * rb)) + (np.sqrt(M) - 1) * H_tilde @ get_ones(N)) / np.sqrt(qam_var)
+    h = 2 * H_tilde_T.T @ (U_λ @ z)
 
     # [rb*N, rb*N], [rb*N, 1]
-    return J, h.T
+    return J, h
 
 def to_ising_DU_LM_SB(H:ndarray, y:ndarray, nbps:int) -> J_h:
     global lmbd
@@ -149,7 +174,7 @@ def solver_qaia_lib(qaia_cls, J:ndarray, h:ndarray) -> ndarray:
 def solver_DU_LM_SB(J:ndarray, h:ndarray) -> ndarray:
     global deltas, eta
     bs = 1
-    solver = DUSB(J, h, deltas, eta, batch_size=1)
+    solver = DUSB(J, h, deltas, eta, batch_size=bs)
     solver.update()
     sample = np.sign(solver.x)      # [rb*N, B]
     if bs > 1:

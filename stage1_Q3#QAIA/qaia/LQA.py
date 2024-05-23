@@ -15,7 +15,6 @@
 """.Local quantum annealing algorithm."""
 # pylint: disable=invalid-name
 import numpy as np
-from scipy.sparse import csr_matrix
 
 from .QAIA import QAIA
 
@@ -28,7 +27,7 @@ class LQA(QAIA):
     Annealing <https://journals.aps.org/prapplied/abstract/10.1103/PhysRevApplied.18.034016>`_.
 
     Args:
-        J (Union[numpy.array, csr_matrix]): The coupling matrix with shape :math:`(N x N)`.
+        J (Union[numpy.array]): The coupling matrix with shape :math:`(N x N)`.
         h (numpy.array): The external field with shape :math:`(N, )`.
         x (numpy.array): The initialized spin value with shape :math:`(N x batch_size)`. Default: ``None``.
         n_iter (int): The number of iterations. Default: ``1000``.
@@ -52,7 +51,6 @@ class LQA(QAIA):
     ):
         """Construct LQA algorithm."""
         super().__init__(J, h, x, n_iter, batch_size)
-        self.J = csr_matrix(self.J)
         self.gamma = gamma
         self.dt = dt
         self.momentum = momentum

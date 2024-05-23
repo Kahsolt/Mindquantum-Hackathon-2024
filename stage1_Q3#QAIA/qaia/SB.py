@@ -15,7 +15,6 @@
 """Simulated bifurcation (SB) algorithms and its variants."""
 # pylint: disable=invalid-name
 import numpy as np
-from scipy.sparse import csr_matrix
 
 from .QAIA import QAIA, OverflowException
 
@@ -28,7 +27,7 @@ class SB(QAIA):
     spin values and momentum.
 
     Args:
-        J (Union[numpy.array, csr_matrix]): The coupling matrix with shape :math:`(N x N)`.
+        J (Union[numpy.array]): The coupling matrix with shape :math:`(N x N)`.
         h (numpy.array): The external field with shape :math:`(N, )`.
         x (numpy.array): The initialized spin value with shape :math:`(N x batch_size)`. Default: ``None``.
         n_iter (int): The number of iterations. Default: ``1000``.
@@ -50,7 +49,6 @@ class SB(QAIA):
     ):
         """Construct SB algorithm."""
         super().__init__(J, h, x, n_iter, batch_size)
-        self.J = csr_matrix(self.J)
         # positive detuning frequency
         self.delta = 1
         self.dt = dt
@@ -58,7 +56,7 @@ class SB(QAIA):
         self.p = np.linspace(0, 1, self.n_iter)
         self.xi = xi
         if self.xi is None:
-            self.xi = 0.5 * np.sqrt(self.N - 1) / np.sqrt(csr_matrix.power(self.J, 2).sum())
+            self.xi = 0.5 * np.sqrt(self.N - 1) / np.linalg.norm(self.J, ord='fro')
         self.x = x
 
         self.initialize()
@@ -82,7 +80,7 @@ class ASB(SB):  # noqa: N801
     Hamiltonian systems <https://www.science.org/doi/10.1126/sciadv.aav2372>`_.
 
     Args:
-        J (Union[numpy.array, csr_matrix]): The coupling matrix with shape :math:`(N x N)`.
+        J (Union[numpy.array]): The coupling matrix with shape :math:`(N x N)`.
         h (numpy.array): The external field with shape :math:`(N, )`.
         x (numpy.array): The initialized spin value with shape :math:`(N x batch_size)`. Default: ``None``.
         n_iter (int): The number of iterations. Default: ``1000``.
@@ -136,7 +134,7 @@ class BSB(SB):  # noqa: N801
     mechanics <https://www.science.org/doi/10.1126/sciadv.abe7953>`_.
 
     Args:
-        J (Union[numpy.array, csr_matrix]): The coupling matrix with shape :math:`(N x N)`.
+        J (Union[numpy.array]): The coupling matrix with shape :math:`(N x N)`.
         h (numpy.array): The external field with shape :math:`(N, )`.
         x (numpy.array): The initialized spin value with shape :math:`(N x batch_size)`. Default: ``None``.
         n_iter (int): The number of iterations. Default: ``1000``.
@@ -184,7 +182,7 @@ class DSB(SB):  # noqa: N801
     mechanics <https://www.science.org/doi/10.1126/sciadv.abe7953>`_.
 
     Args:
-        J (Union[numpy.array, csr_matrix]): The coupling matrix with shape :math:`(N x N)`.
+        J (Union[numpy.array]): The coupling matrix with shape :math:`(N x N)`.
         h (numpy.array): The external field with shape :math:`(N, )`.
         x (numpy.array): The initialized spin value with shape :math:`(N x batch_size)`. Default: ``None``.
         n_iter (int): The number of iterations. Default: ``1000``.

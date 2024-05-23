@@ -15,7 +15,6 @@
 """Coherent Ising Machine with chaotic feedback control algorithm."""
 # pylint: disable=invalid-name
 import numpy as np
-from scipy.sparse import csr_matrix
 
 from .QAIA import QAIA, OverflowException
 
@@ -27,7 +26,7 @@ class CFC(QAIA):
     circuits <https://onlinelibrary.wiley.com/doi/full/10.1002/qute.202100077>`_.
 
     Args:
-        J (Union[numpy.array, csr_matrix]): The coupling matrix with shape :math:`(N x N)`.
+        J (Union[numpy.array]): The coupling matrix with shape :math:`(N x N)`.
         h (numpy.array): The external field with shape :math:`(N, )`.
         x (numpy.array): The initialized spin value with shape :math:`(N x batch_size)`. Default: ``None``.
         n_iter (int): The number of iterations. Default: ``1000``.
@@ -47,7 +46,6 @@ class CFC(QAIA):
     ):
         """Construct CFC algorithm."""
         super().__init__(J, h, x, n_iter, batch_size)
-        self.J = csr_matrix(self.J)
         self.dt = dt
         # The number of first iterations
         self.Tr = int(0.9 * self.n_iter)

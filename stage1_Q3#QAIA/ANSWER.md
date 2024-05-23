@@ -16,6 +16,27 @@
 
 ### solution
 
+```
+- baseline: bSB, B=100, n_iter=100
+- found that LQA is better: LQA, B=100, n_iter=100
+  - score: 0.7834 -> 0.7969
+- add lmmse-regularization: LM-bSB, B=100, n_iter=100
+- rescale reg-term with the best λ: LM-bSB, B=100, n_iter=100, λ=25
+  - score: 0.7969 -> 0.8136
+========================================================================================
+the DU trick does not improve any, stuck here and then the scoring formula changed :)
+========================================================================================
+-> dramatically reduce iterations and repeatition: LM-bSB, B=1, n_iter=10, λ=25
+  - time: 234s -> 5s
+  - score: 33.8763
+-> the DU trick imporves a little under this circumstance: DU-LM-bSB, B=1, n_iter=10
+  - BER: 0.21313 -> 0.20111
+-> conduct program-level optimization with profiling tools
+  - time: 5s -> 3s
+```
+
+### submits
+
 ⚪ baselines (classical)
 
 - `pip install sionna`
@@ -77,7 +98,7 @@
 | method | BER↓ | time↓ | local score↑ | submit score↑ | comment |
 | :-: | :-: | :-: | :-: | :-: | :-: |
 | BSB   | 0.21630 | 234.09 |  0.7837 |         | B=100, n_iter=100 |
-| BSB   | 0.39092 |   3.01 | 47.2953 |         | B=4, n_iter=1 |
+| BSB   | 0.28433 |   1.16 |144.2781 |         | B=1, n_iter=10 |
 | BSB   | 0.39115 |   2.87 | 49.7056 |  0.6092 | B=1, n_iter=1 |
 | LM_SB | 0.18656 |  36.39 |  5.2332 |  4.9567 | B=10, n_iter=100 |
 | LM_SB | 0.18866 |  17.70 | 10.7307 |         | B=3, n_iter=100 |
@@ -90,12 +111,16 @@
 | LM_SB | 0.22977 |   5.09 | 35.4083 |  0.7706 | B=1, n_iter=8 |
 | LM_SB | 0.27122 |   4.89 | 34.9137 |         | B=1, n_iter=4 |
 | LM_SB | 0.35360 |   5.34 | 28.3109 |         | B=1, n_iter=1 |
-| DU_LM_SB | 0.28677 | 5.59 | 29.8412 |         | B=1, n_iter=10, lr=0.01 |
-| DU_LM_SB | 0.20111 | 5.73 | 32.6491 | ??.???? | B=1, n_iter=10, lr=0.01, overfit |
-| DU_LM_SB | 0.21522 | 8.50 | 21.6114 |         | B=1, n_iter=10, lr=0.01, overfit, update_hard |
-| DU_LM_SB | 0.21898 | 6.85 | 26.6877 |         | B=1, n_iter=10, lr=0.01, overfit, use essay c_0 |
-| DU_LM_SB | 0.20650 | 6.87 | 27.0227 |         | B=1, n_iter=10, lr=0.001, overfit |
-| DU_LM_SB | 0.24786 | 5.37 | 32.7820 |         | B=1, n_iter=8, lr=0.01 |
+| DU_LM_SB | 0.28677 | 5.59 | 29.8412 |  | B=1, n_iter=10, lr=0.01 |
+| DU_LM_SB | 0.20111 | 5.73 | 32.6491 |  | B=1, n_iter=10, lr=0.01, overfit |
+| DU_LM_SB | 0.21522 | 8.50 | 21.6114 |  | B=1, n_iter=10, lr=0.01, overfit, update_hard |
+| DU_LM_SB | 0.21898 | 6.85 | 26.6877 |  | B=1, n_iter=10, lr=0.01, overfit, use essay c_0 |
+| DU_LM_SB | 0.20650 | 6.87 | 27.0227 |  | B=1, n_iter=10, lr=0.001, overfit |
+| DU_LM_SB | 0.24786 | 5.37 | 32.7820 |  | B=1, n_iter=8, lr=0.01 |
+| DU_LM_SB | 0.20085 | 3.32 | 56.4051 | 87.0405 | B=1, n_iter=10, lr=0.01, overfit (after profiling) |
+| DU_LM_SB | 0.20049 | 2.89 | 64.8713 | 73.7797 | B=2, n_iter=10, lr=0.01, overfit (after profiling) |
+| DU_LM_SB | 0.20022 | 2.99 | 62.5865 |  | B=3, n_iter=10, lr=0.01, overfit (after profiling) |
+| DU_LM_SB | 0.20046 | 3.07 | 61.0498 |  | B=4, n_iter=10, lr=0.01, overfit (after profiling) |
 
 ### dataset
 
