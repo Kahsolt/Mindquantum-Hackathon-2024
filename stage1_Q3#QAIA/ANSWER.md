@@ -121,6 +121,9 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | DU_LM_SB | 0.20049 | 2.89 | 64.8713 | 73.7797 | B=2, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20022 | 2.99 | 62.5865 |  | B=3, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20046 | 3.07 | 61.0498 |  | B=4, n_iter=10, lr=0.01, overfit (after profiling) |
+| pReg_LM_SB | 0.15602 | 3.60 | 54.9289 | ??.???? | B=1, n_iter=10, lr=0.01, overfit (after profiling) |
+| pReg_LM_SB | 0.15584 | 3.66 | 54.0479 |  | B=2, n_iter=10, lr=0.01, overfit (after profiling) |
+| pReg_LM_SB | 0.15545 | 4.66 | 42.3943 |  | B=3, n_iter=10, lr=0.01, overfit (after profiling) |
 
 ### dataset
 

@@ -49,6 +49,7 @@ IF EXIST %TGT%.zip DEL %TGT%.zip
   %SRC%\MLD_data\* ^
   %SRC%\qaia\* ^
   %SRC%\log\*.json ^
+  %SRC%\log\*.pkl ^
   %SRC%\judger.py ^
   %SRC%\readme.md ^
   %SRC%\main.py

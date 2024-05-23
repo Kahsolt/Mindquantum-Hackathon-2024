@@ -25,23 +25,23 @@ class DUSB(BSB):
         self.η = eta
 
         # Eq. 6 and 12
-        # from essay
+        # from essay, this will NOT work
         #self.c_0: float = 2 * np.sqrt((self.N - 1) / np.power(self.J, 2).sum())
         # from qaia lib
         self.c_0 = self.xi * self.η
-        self.a_neg = 1 - self.p
+        self.a_m1 = self.p - 1
 
     def update(self):
         # Eq. 11 ~ 14, trainable parameters are $Δ_k$ (`dt`) and $η$
         for k, Δ_k in enumerate(self.Δ):
-            self.y += Δ_k * (-self.a_neg[k] * self.x + self.c_0 * (self.J @ self.x + self.h))
+            self.y += Δ_k * (self.a_m1[k] * self.x + self.c_0 * (self.J @ self.x + self.h))
             self.x += Δ_k * self.y
             self.x = φ_s(self.x)
             self.y *= 1 - ψ_s(self.x)
 
     def update_hard(self):
         for k, Δ_k in enumerate(self.Δ):
-            self.y += Δ_k * (-self.a_neg[k] * self.x + self.c_0 * (self.J @ self.x + self.h))
+            self.y += Δ_k * (self.a_m1[k] * self.x + self.c_0 * (self.J @ self.x + self.h))
             self.x += Δ_k * self.y
 
             cond = np.abs(self.x) > 1
