@@ -10,7 +10,15 @@ from qaia import DUSB
 
 BASE_PATH = Path(__file__).parent
 LOG_PATH = BASE_PATH / 'log'
-DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=30_lr=0.01.json'
+DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=10_lr=0.01_overfit.json'
+
+try:
+    with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
+        params = json.load(fh)
+        deltas = params['deltas']
+        eta = params['eta']
+        lmbd = params['lmbd']
+except: pass
 
 J_h = Tuple[ndarray, ndarray]
 
@@ -118,10 +126,7 @@ def to_ising_LM_SB(H:ndarray, y:ndarray, nbps:int, lmbd:int=25) -> J_h:
     return J, h.T
 
 def to_ising_DU_LM_SB(H:ndarray, y:ndarray, nbps:int) -> J_h:
-    with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
-        params = json.load(fh)
-        lmbd = params['lmbd']
-
+    global lmbd
     return to_ising_LM_SB(H, y, nbps, lmbd=lmbd)
 
 def to_ising_MDI_MIMO(H:ndarray, y:ndarray, nbps:int) -> J_h:
@@ -129,30 +134,34 @@ def to_ising_MDI_MIMO(H:ndarray, y:ndarray, nbps:int) -> J_h:
 
 
 def solver_qaia_lib(qaia_cls, J:ndarray, h:ndarray) -> ndarray:
-    solver: QAIA = qaia_cls(J, h, batch_size=1, n_iter=10)
+    bs = 1
+    solver: QAIA = qaia_cls(J, h, batch_size=bs, n_iter=10)
     solver.update()
     sample = np.sign(solver.x)      # [rb*N, B]
-    energy = solver.calc_energy()   # [1, B]
-    opt_index = np.argmin(energy)
+    if bs > 1:
+        energy = solver.calc_energy()   # [1, B]
+        opt_index = np.argmin(energy)
+    else:
+        opt_index = 0
     solution = sample[:, opt_index] # [rb*N], vset {-1, 1}
     return solution
 
 def solver_DU_LM_SB(J:ndarray, h:ndarray) -> ndarray:
-    with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
-        params = json.load(fh)
-        deltas = params['deltas']
-        eta = params['eta']
-
-    solver = DUSB(J, h, deltas, eta, batch_size=100)
+    global deltas, eta
+    bs = 1
+    solver = DUSB(J, h, deltas, eta, batch_size=1)
     solver.update()
     sample = np.sign(solver.x)      # [rb*N, B]
-    energy = solver.calc_energy()   # [1, B]
-    opt_index = np.argmin(energy)
+    if bs > 1:
+        energy = solver.calc_energy()   # [1, B]
+        opt_index = np.argmin(energy)
+    else:
+        opt_index = 0
     solution = sample[:, opt_index] # [rb*N], vset {-1, 1}
     return solution
 
 
-run_cfg = 'LM_SB'
+run_cfg = 'DU_LM_SB'
 
 # 选手提供的Ising模型生成函数，可以用我们提供的to_ising
 def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> J_h:

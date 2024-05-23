@@ -7,8 +7,6 @@ from numpy import ndarray
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from train_DU_LM_SB import LOG_PATH
-
 
 def compute_ber(solution:ndarray, bits:ndarray) -> float:
     '''
@@ -128,8 +126,16 @@ class Judger:
             print(f'  {nbps}: {np.asarray(avgber_per_nbps[nbps]).mean()}')
 
         if 'plot':
+            from pathlib import Path
+            BASE_PATH = Path(__file__).parent
+            LOG_PATH = BASE_PATH / 'log' ; LOG_PATH.mkdir(exist_ok=True)
+            pairs = list(zip(ZF_ber_list, ber_list))
+            pairs.sort(reverse=True)        # decrease order by ZF_ber
+            ber_list = [ber for ZF_ber, ber in pairs]
+            ZF_ber_list = [ZF_ber for ZF_ber, ber in pairs]
             plt.plot(ber_list,    label='ours')
             plt.plot(ZF_ber_list, label='ZF')
+            plt.ylim(0, 0.55)
             plt.legend()
             plt.suptitle('BER')
             plt.tight_layout()

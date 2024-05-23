@@ -67,9 +67,9 @@ class DU_LM_SB(nn.Module):
     B = self.batch_size
     N = J.shape[0]
     # from essay
-    #c_0: float = 2 * math.sqrt((N - 1) / (J**2).sum())
+    c_0: float = 2 * math.sqrt((N - 1) / (J**2).sum())
     # from qaia lib
-    c_0: Tensor = 0.5 * math.sqrt(N - 1) / torch.sqrt((J**2).sum())
+    #c_0: Tensor = 0.5 * math.sqrt(N - 1) / torch.sqrt((J**2).sum())
 
     # rand init x and y
     x = 0.02 * (torch.rand(N, B, device=H.device) - 0.5)
@@ -170,7 +170,7 @@ def make_random_transmit(bits_shape:torch.Size, H:ndarray, nbps:int, SNR:int) ->
 def train(args):
   print('device:', device)
   print('hparam:', vars(args))
-  exp_name = f'DU-LM-SB_T={args.n_iter}_lr={args.lr}'
+  exp_name = f'DU-LM-SB_T={args.n_iter}_lr={args.lr}{"_overfit" if args.overfit else ""}'
 
   ''' Data '''
   dataset = []
@@ -230,9 +230,9 @@ def train(args):
           print('ber:', ber)
           breakpoint()
 
-      if steps % 50 == 0:
+      if (steps + 1) % 50 == 0:
         losses.append(loss.item())
-        print(f'>> [step {steps}] loss: {losses[-1]}')
+        print(f'>> [step {steps + 1}] loss: {losses[-1]}')
   except KeyboardInterrupt:
     pass
 
@@ -263,7 +263,7 @@ def train(args):
 
 if __name__ == '__main__':
   parser = ArgumentParser()
-  parser.add_argument('-T', '--n_iter', default=100, type=int)
+  parser.add_argument('-T', '--n_iter', default=10, type=int)
   parser.add_argument('-B', '--batch_size', default=256, type=int)
   parser.add_argument('--steps', default=3000, type=int)
   parser.add_argument('--lr', default=1e-2, type=float)
