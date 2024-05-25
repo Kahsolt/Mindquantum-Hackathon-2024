@@ -33,6 +33,11 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
   - BER: 0.21313 -> 0.20111
 -> conduct program-level optimization with profiling tools
   - time: 5s -> 3s
+-> pReg: more flexible parametrization
+  - BER: 0.20111 -> 0.15602
+-> ppReg: even more flexible parametrization
+  - BER: 0.15602 -> 0.15490
+  - time: 3s -> 1.3s
 ```
 
 ### submits
@@ -121,9 +126,10 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | DU_LM_SB | 0.20049 | 2.89 | 64.8713 | 73.7797 | B=2, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20022 | 2.99 | 62.5865 |  | B=3, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20046 | 3.07 | 61.0498 |  | B=4, n_iter=10, lr=0.01, overfit (after profiling) |
-| pReg_LM_SB | 0.15602 | 3.60 | 54.9289 | ??.???? | B=1, n_iter=10, lr=0.01, overfit (after profiling) |
-| pReg_LM_SB | 0.15584 | 3.66 | 54.0479 |  | B=2, n_iter=10, lr=0.01, overfit (after profiling) |
-| pReg_LM_SB | 0.15545 | 4.66 | 42.3943 |  | B=3, n_iter=10, lr=0.01, overfit (after profiling) |
+| pReg_LM_SB | 0.15602 | 3.60 | 54.9289 | 95.1233 | B=1, n_iter=10, lr=0.01, overfit |
+| pReg_LM_SB | 0.15584 | 3.66 | 54.0479 |  | B=2, n_iter=10, lr=0.01, overfit |
+| pReg_LM_SB | 0.15545 | 4.66 | 42.3943 |  | B=3, n_iter=10, lr=0.01, overfit |
+| ppReg_LM_SB | 0.15490 | 1.26 | 156.9497 | 137.3652  | B=1, n_iter=10, lr=0.01, overfit |
 
 ### dataset
 

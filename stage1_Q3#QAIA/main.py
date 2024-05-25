@@ -13,8 +13,9 @@ BASE_PATH = Path(__file__).parent
 LOG_PATH = BASE_PATH / 'log'
 DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=10_lr=0.01_overfit.json'
 pReg_LM_SB_weights = LOG_PATH / 'pReg-LM-SB_T=10_lr=0.01_overfit.pkl'
+ppReg_LM_SB_weights = LOG_PATH / 'ppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 
-run_cfg = 'pReg_LM_SB'
+run_cfg = 'ppReg_LM_SB'
 
 if run_cfg == 'DU_LM_SB':
     with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
@@ -30,6 +31,13 @@ elif run_cfg == 'pReg_LM_SB':
         lmbd: float = params['lmbd']
         lmbd_res: Dict[int, ndarray] = params['lmbd_res']
     lmbd_res = {k: v @ v.T for k, v in lmbd_res.items()}    # precompute
+elif run_cfg == 'ppReg_LM_SB':
+    with open(ppReg_LM_SB_weights, 'rb') as fh:
+        params = pkl.load(fh)
+        deltas: ndarray = params['deltas']
+        eta: float = params['eta']
+        lmbd: float = params['lmbd']
+        lmbd_res: Dict[int, ndarray] = params['lmbd_res']
 
 
 J_h = Tuple[ndarray, ndarray]
@@ -126,7 +134,7 @@ def to_ising(H:ndarray, y:ndarray, nbps:int) -> J_h:
     # [rb*N, rb*N], [rb*N, 1]
     return J, h.T
 
-def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray=None) -> J_h:
+def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray=None, lmbd_res_mode:str='res') -> J_h:
     # the size of constellation, the M-QAM where M in {16, 64, 256}
     M = 2**nbps
     # n_elem at TX side (c=2 for real/imag, 1 symbol = 2 elem)
@@ -154,14 +162,19 @@ def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray
         # LM-SB from arXiv:2306.16264, the LMMSE-like part with our divisor fix :)
         U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd
     else:
-        # fully learnable LMMSE-like part
-        # NOTE: here `lmbd_res` should be the precomputed symmetric, this is note the same as in training!!
-        U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd_res) / lmbd
+        if lmbd_res_mode == 'res':
+            # learnable identity-residual LMMSE-like part
+            # NOTE: here `lmbd_res` should be the precomputed symmetric, this is not the same as in training!!
+            U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd_res) / lmbd
+        elif lmbd_res_mode == 'proj':
+            # fully learnable projection space
+            U_λ = lmbd_res
     H_tilde_T = H_tilde @ T
-    J = -H_tilde_T.T @ U_λ @ H_tilde_T * (2 / qam_var)
+    U_λ_norm = U_λ * (2 / qam_var)
+    J = -H_tilde_T.T @ U_λ_norm @ H_tilde_T 
     for j in range(J.shape[0]): J[j, j] = 0
     z = (y_tilde - H_tilde @ (T @ get_ones(N * rb)) + (np.sqrt(M) - 1) * H_tilde @ get_ones(N)) / np.sqrt(qam_var)
-    h = 2 * H_tilde_T.T @ (U_λ @ z)
+    h = H_tilde_T.T @ (U_λ @ (2 * z))
 
     # [rb*N, rb*N], [rb*N, 1]
     return J, h
@@ -208,6 +221,8 @@ def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> J_h:
         return to_ising_ext(H, y, nbps, lmbd=lmbd)
     elif run_cfg == 'pReg_LM_SB':
         return to_ising_ext(H, y, nbps, lmbd=lmbd, lmbd_res=lmbd_res[H.shape[0]])
+    elif run_cfg == 'ppReg_LM_SB':
+        return to_ising_ext(H, y, nbps, lmbd=lmbd, lmbd_res=lmbd_res[H.shape[0]], lmbd_res_mode='proj')
 
 # 选手提供的qaia MLD求解器，用mindquantum.algorithms.qaia
 def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
@@ -215,5 +230,5 @@ def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
         return solver_qaia_lib(BSB, J, h)
     elif run_cfg == 'LM_SB':
         return solver_qaia_lib(BSB, J, h)
-    elif run_cfg in ['DU_LM_SB', 'pReg_LM_SB']:
+    elif run_cfg in ['DU_LM_SB', 'pReg_LM_SB', 'ppReg_LM_SB']:
         return solver_DU_LM_SB(J, h)

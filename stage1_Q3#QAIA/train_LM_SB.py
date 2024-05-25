@@ -107,7 +107,21 @@ class pReg_LM_SB(DU_LM_SB):
     return to_ising_ext(H, y, nbps, self.λ, U_λ_res)
 
 
-def to_ising_ext(H:Tensor, y:Tensor, nbps:int, lmbd:Tensor, lmbd_res:Tensor=None) -> Tuple[Tensor, Tensor]:
+class ppReg_LM_SB(pReg_LM_SB):
+
+  def __init__(self, T:int, batch_size:int=100):
+    super().__init__(T, batch_size)
+
+  def get_J_h(self, H:Tensor, y:Tensor, nbps:int) -> Tuple[Tensor, Tensor]:
+    if H.shape[0] == 64:
+      U_λ_res = self.U_λ_res_64
+    elif H.shape[0] == 128:
+      U_λ_res = self.U_λ_res_128
+    else: raise ValueError(f'not support H.shape: {H.shape}')
+    return to_ising_ext(H, y, nbps, self.λ, U_λ_res, lmbd_res_mode='proj')
+
+
+def to_ising_ext(H:Tensor, y:Tensor, nbps:int, lmbd:Tensor, lmbd_res:Tensor=None, lmbd_res_mode:str='res') -> Tuple[Tensor, Tensor]:
   ''' pytorch version of to_ising_ext() '''
 
   # the size of constellation, the M-QAM where M in {16, 64, 256}
@@ -136,10 +150,13 @@ def to_ising_ext(H:Tensor, y:Tensor, nbps:int, lmbd:Tensor, lmbd_res:Tensor=None
 
   # Eq. 10
   # LMMSE-like part, with our fix
-  if lmbd_res is None:    # DU_LM_SB
+  if lmbd_res is None:
     U_λ = torch.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd
-  else:                   # pReg_LM_SB
-    U_λ = torch.linalg.inv(H_tilde @ H_tilde.T + lmbd_res @ lmbd_res.T) / lmbd
+  else:
+    if lmbd_res_mode == 'res':
+      U_λ = torch.linalg.inv(H_tilde @ H_tilde.T + lmbd_res @ lmbd_res.T) / lmbd
+    elif lmbd_res_mode == 'proj':
+      U_λ = lmbd_res
   H_tilde_T = H_tilde @ T
   J = -H_tilde_T.T @ U_λ @ H_tilde_T * (2 / qam_var)
   J = J * (1 - torch.eye(J.shape[0], device=H.device))    # mask diagonal to zeros
@@ -262,7 +279,7 @@ def train(args):
   model.train()
   try:
     pbar = tqdm(total=args.steps-init_step)
-    while steps < args.steps:
+    while steps < init_step + args.steps:
       if not args.no_shuffle and steps_minor % len(dataset) == 0:
         random.shuffle(dataset)
       sample = dataset[steps_minor % len(dataset)]
@@ -321,8 +338,9 @@ def train(args):
     with open(LOG_PATH / f'{exp_name}.json', 'w', encoding='utf-8') as fh:
       json.dump(params, fh, indent=2, ensure_ascii=False)
 
-  if args.M == 'pReg_LM_SB':
+  if args.M in ['pReg_LM_SB', 'ppReg_LM_SB']:
     with torch.no_grad():
+      model: pReg_LM_SB
       weights = {
         'deltas': model.Δ.detach().cpu().numpy().tolist(),
         'eta':    model.η.detach().cpu().item(),
@@ -342,10 +360,10 @@ def train(args):
 
 if __name__ == '__main__':
   parser = ArgumentParser()
-  parser.add_argument('-M', default='DU_LM_SB', choices=['DU_LM_SB', 'pReg_LM_SB'])
+  parser.add_argument('-M', default='DU_LM_SB', choices=['DU_LM_SB', 'pReg_LM_SB', 'ppReg_LM_SB'])
   parser.add_argument('-T', '--n_iter', default=10, type=int)
   parser.add_argument('-B', '--batch_size', default=32, type=int, help='SB candidate batch size')
-  parser.add_argument('--steps', default=3000, type=int)
+  parser.add_argument('--steps', default=30000, type=int)
   parser.add_argument('--grad_acc', default=1, type=int, help='training batch size')
   parser.add_argument('--lr', default=1e-2, type=float)
   parser.add_argument('--load', help='ckpt to resume')
