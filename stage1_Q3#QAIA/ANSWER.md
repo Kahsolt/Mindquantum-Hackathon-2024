@@ -130,6 +130,7 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | pReg_LM_SB | 0.15584 | 3.66 | 54.0479 |  | B=2, n_iter=10, lr=0.01, overfit |
 | pReg_LM_SB | 0.15545 | 4.66 | 42.3943 |  | B=3, n_iter=10, lr=0.01, overfit |
 | ppReg_LM_SB | 0.15490 | 1.26 | 156.9497 | 137.3652  | B=1, n_iter=10, lr=0.01, overfit |
+| pppReg_LM_SB | 0.20343 | 1.25 | 149.3551 | 137.3652  | B=1, n_iter=10, lr=0.01, overfit |
 
 ### dataset
 

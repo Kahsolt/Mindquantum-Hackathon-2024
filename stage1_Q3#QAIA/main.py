@@ -14,6 +14,7 @@ LOG_PATH = BASE_PATH / 'log'
 DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=10_lr=0.01_overfit.json'
 pReg_LM_SB_weights = LOG_PATH / 'pReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 ppReg_LM_SB_weights = LOG_PATH / 'ppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
+pppReg_LM_SB_weights = LOG_PATH / 'pppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 
 run_cfg = 'ppReg_LM_SB'
 
@@ -38,6 +39,13 @@ elif run_cfg == 'ppReg_LM_SB':
         eta: float = params['eta']
         lmbd: float = params['lmbd']
         lmbd_res: Dict[int, ndarray] = params['lmbd_res']
+elif run_cfg == 'pppReg_LM_SB':
+    with open(pppReg_LM_SB_weights, 'rb') as fh:
+        params = pkl.load(fh)
+        deltas: ndarray = params['deltas']
+        eta: float = params['eta']
+        lmbd: float = params['lmbd']
+        lmbd_res: Dict[int, Dict[int, ndarray]] = params['lmbd_res']
 
 
 J_h = Tuple[ndarray, ndarray]
@@ -223,6 +231,8 @@ def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> J_h:
         return to_ising_ext(H, y, nbps, lmbd=lmbd, lmbd_res=lmbd_res[H.shape[0]])
     elif run_cfg == 'ppReg_LM_SB':
         return to_ising_ext(H, y, nbps, lmbd=lmbd, lmbd_res=lmbd_res[H.shape[0]], lmbd_res_mode='proj')
+    elif run_cfg == 'pppReg_LM_SB':
+        return to_ising_ext(H, y, nbps, lmbd=lmbd, lmbd_res=lmbd_res[snr][H.shape[0]], lmbd_res_mode='proj')
 
 # 选手提供的qaia MLD求解器，用mindquantum.algorithms.qaia
 def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
@@ -230,5 +240,5 @@ def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
         return solver_qaia_lib(BSB, J, h)
     elif run_cfg == 'LM_SB':
         return solver_qaia_lib(BSB, J, h)
-    elif run_cfg in ['DU_LM_SB', 'pReg_LM_SB', 'ppReg_LM_SB']:
+    elif run_cfg in ['DU_LM_SB', 'pReg_LM_SB', 'ppReg_LM_SB', 'pppReg_LM_SB']:
         return solver_DU_LM_SB(J, h)

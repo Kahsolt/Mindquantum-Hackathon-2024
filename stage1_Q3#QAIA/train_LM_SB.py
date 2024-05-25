@@ -8,7 +8,7 @@ import random
 import pickle as pkl
 from pathlib import Path
 from argparse import ArgumentParser
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 import torch
 import torch.nn as nn
@@ -59,9 +59,9 @@ class DU_LM_SB(nn.Module):
   def get_J_h(self, H:Tensor, y:Tensor, nbps:int) -> Tuple[Tensor, Tensor]:
     return to_ising_ext(H, y, nbps, self.λ)
 
-  def forward(self, H:Tensor, y:Tensor, nbps:int) -> Tensor:
+  def forward(self, H:Tensor, y:Tensor, nbps:int, **kwargs) -> Tensor:
     ''' LM part '''
-    J, h = self.get_J_h(H, y, nbps)
+    J, h = self.get_J_h(H, y, nbps, **kwargs)
 
     ''' DU-SB part '''
     # Eq. 6 and 12
@@ -91,6 +91,8 @@ class DU_LM_SB(nn.Module):
 
 class pReg_LM_SB(DU_LM_SB):
 
+  ''' parametraized-regularizing DU-LM-SB '''
+
   def __init__(self, T:int, batch_size:int=100):
     super().__init__(T, batch_size)
 
@@ -106,8 +108,21 @@ class pReg_LM_SB(DU_LM_SB):
     else: raise ValueError(f'not support H.shape: {H.shape}')
     return to_ising_ext(H, y, nbps, self.λ, U_λ_res)
 
+  def gather_weights_pickle(self) -> Dict[str, Any]:
+      return {
+        'deltas': self.Δ.detach().cpu().numpy().tolist(),
+        'eta':    self.η.detach().cpu().item(),
+        'lmbd':   self.λ.detach().cpu().item(),
+        'lmbd_res': {
+          128: self.U_λ_res_128.detach().cpu().numpy(),
+          64:  self.U_λ_res_64 .detach().cpu().numpy(),
+        }
+      }
+
 
 class ppReg_LM_SB(pReg_LM_SB):
+
+  ''' projective parametraized-regularizing DU-LM-SB '''
 
   def __init__(self, T:int, batch_size:int=100):
     super().__init__(T, batch_size)
@@ -119,6 +134,42 @@ class ppReg_LM_SB(pReg_LM_SB):
       U_λ_res = self.U_λ_res_128
     else: raise ValueError(f'not support H.shape: {H.shape}')
     return to_ising_ext(H, y, nbps, self.λ, U_λ_res, lmbd_res_mode='proj')
+
+
+class pppReg_LM_SB(DU_LM_SB):
+
+  ''' per-SNR projective parametraized-regularizing DU-LM-SB '''
+
+  def __init__(self, T:int, batch_size:int=100):
+    super().__init__(T, batch_size)
+
+    # the trainable lmmse-like part :)
+    self.snr_list = [10, 15, 20]
+    self.N_list = [64, 128]
+    for snr in self.snr_list:
+      for N in self.N_list:
+        name = f'U_λ_{snr}_{N}'
+        p = Parameter(torch.diag(self.λ.sqrt() * torch.ones([2*N],  dtype=torch.float32)), requires_grad=True)
+        self.register_parameter(name, p)
+
+  def get_J_h(self, H:Tensor, y:Tensor, nbps:int, **kwargs) -> Tuple[Tensor, Tensor]:
+    snr = kwargs['snr']
+    U_λ_res = self.get_parameter(f'U_λ_{snr}_{H.shape[0]}')
+    assert U_λ_res is not None, f'not support snr: {snr}, H.shape: {H.shape}'
+    return to_ising_ext(H, y, nbps, self.λ, U_λ_res, lmbd_res_mode='proj')
+
+  def gather_weights_pickle(self) -> Dict[str, Any]:
+      return {
+        'deltas': self.Δ.detach().cpu().numpy().tolist(),
+        'eta':    self.η.detach().cpu().item(),
+        'lmbd':   self.λ.detach().cpu().item(),
+        'lmbd_res': {
+          snr: {
+            N: self.get_parameter(f'U_λ_{snr}_{N}').detach().cpu().numpy() 
+              for N in self.N_list
+          } for snr in self.snr_list
+        }
+      }
 
 
 def to_ising_ext(H:Tensor, y:Tensor, nbps:int, lmbd:Tensor, lmbd_res:Tensor=None, lmbd_res_mode:str='res') -> Tuple[Tensor, Tensor]:
@@ -288,7 +339,10 @@ def train(args):
       if not args.overfit:
         bits, y = make_random_transmit(bits.shape, H, nbps, SNR)
 
-      spins = model(H, y, nbps)
+      if isinstance(model, pppReg_LM_SB):
+        spins = model(H, y, nbps, snr=SNR)
+      else:
+        spins = model(H, y, nbps)
       loss = torch.stack([ber_loss(sp, bits) for sp in spins]).mean()
       loss_for_backward: Tensor = loss / args.grad_acc
       loss_for_backward.backward()
@@ -338,18 +392,10 @@ def train(args):
     with open(LOG_PATH / f'{exp_name}.json', 'w', encoding='utf-8') as fh:
       json.dump(params, fh, indent=2, ensure_ascii=False)
 
-  if args.M in ['pReg_LM_SB', 'ppReg_LM_SB']:
+  if args.M in ['pReg_LM_SB', 'ppReg_LM_SB', 'pppReg_LM_SB']:
     with torch.no_grad():
       model: pReg_LM_SB
-      weights = {
-        'deltas': model.Δ.detach().cpu().numpy().tolist(),
-        'eta':    model.η.detach().cpu().item(),
-        'lmbd':   model.λ.detach().cpu().item(),
-        'lmbd_res': {
-          128: model.U_λ_res_128.detach().cpu().numpy(),
-          64:  model.U_λ_res_64 .detach().cpu().numpy(),
-        }
-      }
+      weights = model.gather_weights_pickle()
     with open(LOG_PATH / f'{exp_name}.pkl', 'wb') as fh:
       pkl.dump(weights, fh)
 
@@ -359,11 +405,13 @@ def train(args):
 
 
 if __name__ == '__main__':
+  METHODS = [name for name, value in globals().items() if type(value) == type(DU_LM_SB) and issubclass(value, DU_LM_SB)]
+
   parser = ArgumentParser()
-  parser.add_argument('-M', default='DU_LM_SB', choices=['DU_LM_SB', 'pReg_LM_SB', 'ppReg_LM_SB'])
+  parser.add_argument('-M', default='DU_LM_SB', choices=METHODS)
   parser.add_argument('-T', '--n_iter', default=10, type=int)
   parser.add_argument('-B', '--batch_size', default=32, type=int, help='SB candidate batch size')
-  parser.add_argument('--steps', default=30000, type=int)
+  parser.add_argument('--steps', default=3000, type=int)
   parser.add_argument('--grad_acc', default=1, type=int, help='training batch size')
   parser.add_argument('--lr', default=1e-2, type=float)
   parser.add_argument('--load', help='ckpt to resume')
