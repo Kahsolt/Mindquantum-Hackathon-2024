@@ -2,22 +2,22 @@
 # Author: Armit
 # Create Time: 2024/05/07 
 
+# 查看各样例在指定查找表上的初始能量
+
 import numpy as np
+from numpy import ndarray
 from mindquantum.simulator import Simulator
 from mindquantum.core.operators import Hamiltonian
 
+from utils.path import LOG_PATH
 from utils.qcirc import qaoa_hubo, build_ham_high
 from score import load_data
-from main import main, LOG_PATH
+from main import main_baseline
 
-from code import interact
 
-save_fp = LOG_PATH / 'score_mat.npy'
-
-def run():
+def make_score_mat() -> ndarray:
   Nq = 12
   sim = Simulator('mqvector', n_qubits=Nq)
-
   # [prop, k, coef, r, depth(p)]
   score_mat = np.zeros([3, 4, 3, 10, 2], dtype=np.float32)
 
@@ -30,18 +30,21 @@ def run():
           ham = Hamiltonian(build_ham_high(Jc_dict))
 
           for did, depth in enumerate([4, 8]):
-            gamma_List, beta_List = main(Jc_dict, depth, Nq)
+            # NOTE: change this to what lookup_table you want to use!!
+            gamma_List, beta_List = main_baseline(Jc_dict, depth, Nq)
             circ = qaoa_hubo(Jc_dict, Nq, gamma_List, beta_List, p=depth)
             E = sim.get_expectation(ham, circ).real
             score_mat[pid, kid, cid, r, did] = E
 
-  np.save(save_fp, score_mat)
+  return score_mat
 
 
+save_fp = LOG_PATH / 'score_mat.npy'
 if not save_fp.exists():
-  run()
-
+  score_mat = make_score_mat()
+  np.save(save_fp, score_mat)
 score_mat = np.load(save_fp)
+
 
 if 'stats':
   [score_mat[i, ...]         .mean() for i in range(3)]
@@ -71,4 +74,5 @@ if 'stats':
 #   avg: [-126.21123, -154.18483]
 #   std: [82.35353, 106.02304]
 
+from code import interact
 interact(local=globals())

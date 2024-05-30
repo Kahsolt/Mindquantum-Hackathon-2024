@@ -1,24 +1,26 @@
-from typing import *
+from typing import Dict, Tuple
 
 import numpy as np
 from numpy import ndarray
+
+from utils.path import LOG_PATH
+from utils.lookup_table import load_lookup_table
+
+lookup_table = load_lookup_table(LOG_PATH / 'lookup_table-iter=1400.json')
 
 
 def ave_D(Jc, nq):      # average degree
     return 2 * len(Jc) / nq
 
-
-def order(Jc):
+def order(Jc):          # graph order
     return max([len(key) for key in Jc.keys()])
 
-
 def trans_gamma(gammas, D):
-    # Eq. (10) from arXiv:2201.11785, without 1/|w|
+    # Eq. 10 from arXiv:2201.11785, without 1/|w|
     return gammas * np.arctan(1 / np.sqrt(D - 1)) 
 
-
-def rescale_factor_original(Jc):
-    # Eq. (10) from arXiv:2201.11785, i.e. 1/Σ|w|
+def rescale_factor_arXiv_2201_11785(Jc):
+    # Eq. 10 from arXiv:2201.11785, i.e. 1/Σ|w|
     keys_len = {}
     for key in Jc.keys():
         if len(key) in keys_len:
@@ -30,9 +32,8 @@ def rescale_factor_original(Jc):
         norm += abs(val/keys_len[len(key)])
     return 1 / norm
 
-
 def rescale_factor(Jc):
-    # Eq. (87) from arXiv:2305.15201v1, ie. 1/sqrt(Σw**2)
+    # Eq. 87 from arXiv:2305.15201, i.e. 1/sqrt(Σw**2)
     keys_len = {}
     for key in Jc.keys():
         if len(key) in keys_len:
@@ -46,7 +47,7 @@ def rescale_factor(Jc):
     return 1 / norm
 
 
-def main_original(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12) -> Tuple[ndarray, ndarray]:
+def main_baseline(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12) -> Tuple[ndarray, ndarray]:
     '''
         The main function you need to change!!!
     Args:
@@ -73,25 +74,10 @@ def main_original(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12) -> Tuple[nd
                     betas = np.array([float(new_row[i]) for i in range(3 + p, 3 + 2 * p)])
     # rescale the parameters for specific case
     gammas = trans_gamma(gammas, D)
-    factor = rescale_factor(Jc_dict) * 1.275
+    factor = rescale_factor(Jc_dict)
     return gammas * factor, betas
 
-
-import json
-from pathlib import Path
-
-BASE_PATH = Path(__file__).parent
-LOG_PATH = BASE_PATH / 'log' ; LOG_PATH.mkdir(exist_ok=True)
-
-def load_finetuned_lookup_table(fp:Path):
-    with open(fp, 'r', encoding='utf-8') as fh:
-        lookup_table = json.load(fh)
-    lookup_table = {int(p): {int(k): np.asarray(params) for k, params in data.items()} for p, data in lookup_table.items()}
-    return lookup_table
-
-lookup_table = load_finetuned_lookup_table(LOG_PATH / 'lookup_table-iter=1000.json')
-
-def main(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12) -> Tuple[ndarray, ndarray]:
+def main(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12, rescaler:float=1.275) -> Tuple[ndarray, ndarray]:
     global lookup_table
 
     D = ave_D(Jc_dict, Nq)
@@ -100,5 +86,5 @@ def main(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12) -> Tuple[ndarray, nd
     params = lookup_table[p][k]
     gammas, betas = np.split(params, 2)
     gammas = trans_gamma(gammas, D)
-    factor = rescale_factor(Jc_dict) * 1.275
+    factor = rescale_factor(Jc_dict) * rescaler
     return gammas * factor, betas

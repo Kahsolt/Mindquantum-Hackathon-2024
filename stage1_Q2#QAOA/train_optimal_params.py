@@ -2,10 +2,8 @@
 # Author: Armit
 # Create Time: 2024/05/07 
 
-import json
-import random
-from copy import deepcopy
-from re import compile as Regex
+# 为每个样例寻找其最优参数
+
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -20,21 +18,16 @@ from mindquantum.framework import MQAnsatzOnlyLayer
 import numpy as np
 from tqdm import tqdm
 
-from vis_transfer_data import load_lookup_table
+from utils.path import DATA_OPT_PATH ; DATA_OPT_PATH.mkdir(exist_ok=True)
+from utils.lookup_table import load_lookup_table_original, dump_lookup_table
 from utils.qcirc import qaoa_hubo, build_ham_high
 from score import load_data
 from main import ave_D, order, trans_gamma, rescale_factor
 
 context.set_context(device_target='CPU', mode=ms.PYNATIVE_MODE, pynative_synchronize=True)
 
-BASE_PATH = Path(__file__).parent
-LOG_PATH = BASE_PATH / 'log' ; LOG_PATH.mkdir(exist_ok=True)
-
 
 def train(args):
-  save_dp = LOG_PATH / 'optimal'
-  save_dp.mkdir(exist_ok=True)
-
   ''' Data '''
   if 'peek score':
     score = 0
@@ -54,7 +47,8 @@ def train(args):
           Jc_dict = load_data(fp)
           dataset.append((fp, Jc_dict))
 
-  lookup_table = load_lookup_table()
+  ''' Ckpt '''
+  lookup_table = load_lookup_table_original()
 
   ''' Simulator '''
   Nq = 12
@@ -64,6 +58,7 @@ def train(args):
   for fp, Jc_dict in tqdm(dataset):
     opt_params = {}
     for p in [4, 8]:
+      # ham
       ham = Hamiltonian(build_ham_high(Jc_dict))
       D = ave_D(Jc_dict, Nq)
       k = min(order(Jc_dict), 6)
@@ -76,7 +71,7 @@ def train(args):
       # init_p
       params = lookup_table[p][k]
       gammas, betas = np.split(params, 2)
-      factor = rescale_factor(Jc_dict)    # rescale gamma
+      factor = rescale_factor(Jc_dict) * args.rescaler    # rescale gamma
       gammas = trans_gamma(gammas, D) * factor
 
       # align order with qcir (param => weights)
@@ -131,19 +126,19 @@ def train(args):
 
       opt_params[p] = tuned_params.tolist()
 
-    save_fp: Path = save_dp / fp.replace('data/', '')
+    # save opt params
+    save_fp: Path = DATA_OPT_PATH / fp.replace('data/', '')
     save_fp.parent.mkdir(exist_ok=True, parents=True)
-    with open(save_fp, 'w', encoding='utf-8') as fh:
-      json.dump(opt_params, fh, indent=2, ensure_ascii=False)
+    dump_lookup_table(opt_params, save_fp)
 
   print(f'peek score: {score:.5f}') 
 
 
 if __name__ == '__main__':
   parser = ArgumentParser()
-  parser.add_argument('--steps', default=10000, type=int)
+  parser.add_argument('--steps', default=1000, type=int, help='optim steps per sample case')
   parser.add_argument('--lr', default=1e-4, type=float)
-  parser.add_argument('--load')
+  parser.add_argument('--rescaler', default=1.0, type=float, help='gamma rescaler')
   args = parser.parse_args()
 
   train(args)

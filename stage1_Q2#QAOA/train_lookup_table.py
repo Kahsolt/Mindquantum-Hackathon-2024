@@ -2,11 +2,10 @@
 # Author: Armit
 # Create Time: 2024/05/07 
 
-import json
+# 微调预制表 (Euler step 方法)
+
 import random
-from copy import deepcopy
 from re import compile as Regex
-from pathlib import Path
 from argparse import ArgumentParser
 
 import mindspore as ms
@@ -20,25 +19,16 @@ from mindquantum.framework import MQAnsatzOnlyLayer
 import numpy as np
 from tqdm import tqdm
 
-from vis_transfer_data import load_lookup_table, LookupTable
+from utils.path import LOG_PATH
+from utils.lookup_table import load_lookup_table_original, load_lookup_table, dump_lookup_table
 from utils.qcirc import qaoa_hubo, build_ham_high
 from score import load_data
-from main import ave_D, order, trans_gamma, rescale_factor, load_finetuned_lookup_table
+from main import ave_D, order, trans_gamma, rescale_factor
 
 context.set_context(device_target='CPU', mode=ms.PYNATIVE_MODE, pynative_synchronize=True)
 
-BASE_PATH = Path(__file__).parent
-LOG_PATH = BASE_PATH / 'log' ; LOG_PATH.mkdir(exist_ok=True)
 
 R_ITER = Regex('iter=(\d+)')
-
-
-def _cvt_lookup_table(lookup_table:LookupTable) -> LookupTable:
-  ret = deepcopy(lookup_table)
-  for p, data in ret.items():
-    for k, v in data.items():
-      ret[p][k] = v.tolist()
-  return ret
 
 
 def train(args):
@@ -51,17 +41,19 @@ def train(args):
           Jc_dict = load_data(f"data/k{k}/{coef}_p{propotion}_{r}.json")
           dataset.append(Jc_dict)
 
+  ''' Ckpt '''
   if args.load:
-    lookup_table = load_finetuned_lookup_table(args.load)
+    lookup_table = load_lookup_table(args.load)
     try:
       init_iter = int(R_ITER.findall(args.load)[0])
     except:
       init_iter = 0
   else:
-    lookup_table = load_lookup_table()
+    lookup_table = load_lookup_table_original()
     init_iter = 0
-    with open(LOG_PATH / 'lookup_table-origial.json', 'w', encoding='utf-8') as fh:
-      json.dump(_cvt_lookup_table(lookup_table), fh, indent=2, ensure_ascii=False)
+    save_fp = LOG_PATH / 'lookup_table-original.json'
+    if not save_fp.exists():
+      dump_lookup_table(lookup_table, save_fp)
 
   ''' Simulator '''
   Nq = 12
@@ -69,12 +61,10 @@ def train(args):
 
   ''' Train '''
   for iter in tqdm(range(init_iter, args.iters), initial=init_iter, total=args.iters):
-    if iter % len(dataset) == 0:
-      random.shuffle(dataset)
-    # random pick a ham and circuit depth
+    # random pick a sample and circuit depth
+    if iter % len(dataset) == 0: random.shuffle(dataset)
     Jc_dict = dataset[iter % len(dataset)]
     p = random.choice([4, 8])
-
     ham = Hamiltonian(build_ham_high(Jc_dict))
     D = ave_D(Jc_dict, Nq)
     k = min(order(Jc_dict), 6)
@@ -87,7 +77,7 @@ def train(args):
     # init_p
     params = lookup_table[p][k]
     gammas, betas = np.split(params, 2)
-    factor = rescale_factor(Jc_dict) * 1.275    # rescale gamma
+    factor = rescale_factor(Jc_dict) * args.rescaler    # rescale gamma
     gammas = trans_gamma(gammas, D) * factor
 
     # align order with qcir (param => weights)
@@ -106,10 +96,12 @@ def train(args):
     net = MQAnsatzOnlyLayer(grad_ops, weight=init_weights)
     opt = Adam(net.trainable_params(), learning_rate=args.lr)
     train_step = TrainOneStepCell(net, opt)
+    E_before = net().item()
     for step in range(args.steps):
       loss = train_step()
       if step % 10 == 0:
         print(f'>> [step {step}] loss: {loss.item()}')
+    E_after = net().item()
 
     L1 = F.l1_loss(net.weight, init_weights)
     print(f'>> [dist] L1: {L1.mean()}, Linf: {L1.max()}')
@@ -131,24 +123,30 @@ def train(args):
     tuned_gammas /= factor * np.arctan(1 / np.sqrt(D - 1))  # inv rescale gamma
     tuned_betas = np.asarray(tuned_betas)
     tuned_params = np.concatenate([tuned_gammas, tuned_betas])
-    lookup_table[p][k] = (1 - args.dx) * params + args.dx * tuned_params
+
+    # adaptive step size: lr ∝ ΔE
+    dx_decay = args.dx_decay ** (init_iter // args.dx_decay_every)
+    ΔE = E_before - E_after
+    lr = args.dx * dx_decay * np.log1p(ΔE)
+    lookup_table[p][k] = (1 - lr) * params + lr * tuned_params
 
     # tmp ckpt
     if (iter + 1) % 100 == 0:
-      with open(LOG_PATH / f'lookup_table-iter={iter+1}.json', 'w', encoding='utf-8') as fh:
-        json.dump(_cvt_lookup_table(lookup_table), fh, indent=2, ensure_ascii=False)
+      dump_lookup_table(lookup_table, LOG_PATH / f'lookup_table-iter={iter+1}.json')
 
   ''' Ckpt '''
-  with open(LOG_PATH / 'lookup_table.json', 'w', encoding='utf-8') as fh:
-    json.dump(_cvt_lookup_table(lookup_table), fh, indent=2, ensure_ascii=False)
+  dump_lookup_table(lookup_table, LOG_PATH / 'lookup_table.json')
 
 
 if __name__ == '__main__':
   parser = ArgumentParser()
-  parser.add_argument('--iters', default=10000, type=int)
-  parser.add_argument('--steps', default=100, type=int)
+  parser.add_argument('--iters', default=10000, type=int, help='optim iter case count')
+  parser.add_argument('--steps', default=100, type=int, help='optim steps per sample case')
   parser.add_argument('--lr', default=1e-5, type=float)
   parser.add_argument('--dx', default=0.1, type=float)
+  parser.add_argument('--dx_decay', default=0.98, type=float)
+  parser.add_argument('--dx_decay_every', default=100, type=int)
+  parser.add_argument('--rescaler', default=1.275, type=float, help='gamma rescaler')
   parser.add_argument('--load')
   args = parser.parse_args()
 
