@@ -1,2 +1,7 @@
 # generated training data
 data_opt/
+
+# vis_lookup_table
+img/*
+!img/embed_orig.png
+!img/interp.png

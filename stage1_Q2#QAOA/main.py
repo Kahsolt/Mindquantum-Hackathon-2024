@@ -2,11 +2,12 @@ from typing import Dict, Tuple
 
 import numpy as np
 from numpy import ndarray
+from scipy.interpolate import interp1d
 
 from utils.path import LOG_PATH
 from utils.lookup_table import load_lookup_table
 
-lookup_table = load_lookup_table(LOG_PATH / 'lookup_table-iter=1400.json')
+lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay' / 'lookup_table-iter=5600.json')
 
 
 def ave_D(Jc, nq):      # average degree
@@ -83,8 +84,56 @@ def main(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12, rescaler:float=1.275
     D = ave_D(Jc_dict, Nq)
     k = order(Jc_dict)
     k = min(k, 6)
-    params = lookup_table[p][k]
+    if p in [4, 8] or k not in [2, 3, 4, 5]:    # these are directly trained
+        params = lookup_table[p][k]
+    else:                                       # interp for other case
+        params = interp_expand(p, k)
     gammas, betas = np.split(params, 2)
     gammas = trans_gamma(gammas, D)
     factor = rescale_factor(Jc_dict) * rescaler
     return gammas * factor, betas
+
+
+def interp_expand(p:int, k:int) -> ndarray:
+    # build model
+    p4 = lookup_table[4][k]
+    p8 = lookup_table[8][k]
+    p4_g, p4_b = np.split(p4, 2)
+    p8_g, p8_b = np.split(p8, 2)
+    p4_g_interp = np.asarray([p8_g[0]] + [(x+y)/2 for x, y in zip(p4_g, p4_g[1:])])
+    p4_b_interp = np.asarray([(x+y)/2 for x, y in zip(p4_b, p4_b[1:])] + [p8_b[-1]])
+    p4_g_expand = np.asarray([[x, y] for x, y in zip(p4_g_interp, p4_g)]).flatten()
+    p4_b_expand = np.asarray([[x, y] for x, y in zip(p4_b, p4_b_interp)]).flatten()
+    p4_expand = np.concatenate([p4_g_expand, p4_b_expand], axis=0)
+    fused = (p8 + p4_expand) / 2
+    p_g, p_b = np.split(fused, 2)
+    x_virtual = np.linspace(0.0, 1.0, len(p_g))
+    func_g = interp1d(x_virtual, p_g)
+    func_b = interp1d(x_virtual, p_b)
+
+    # lerp: N points => p points
+    x_sample = np.linspace(0.0, 1.0, p)
+    p_s_g = func_g(x_sample)
+    p_s_b = func_b(x_sample)
+    p_s = np.concatenate([p_s_g, p_s_b], axis=0)
+
+    if not 'debug':
+        import matplotlib.pyplot as plt
+        plt.subplot(211)
+        plt.plot(p4_expand, label='p4 (ex.)')
+        plt.plot(p8,        label='p8')
+        plt.plot(fused,     label='fused')
+        plt.legend()
+        plt.subplot(212)
+        plt.plot(p_s, label='p_s')
+        plt.legend()
+        plt.suptitle(f'interp demo: 4/8 => {p}')
+        plt.show()
+
+    return p_s
+
+
+if __name__ == '__main__':
+    params = interp_expand(p=6, k=4)
+    print('params.shape:', params.shape)
+    print('params:', params)
