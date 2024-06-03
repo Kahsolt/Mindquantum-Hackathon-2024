@@ -25,6 +25,13 @@
     - 去除空线路噪声
     - ZNE
     - 多测几次取最低
+- 知识
+  - $ H \left| \psi_0 \right> = \lambda_{min} \left| \psi_0 \right> $, 其中 $ \left| \psi_0 \right> $ 是 $ H $ 最小特征值 $ \lambda_{min} $ 所对应的特征向量 = 系统 $ H $ 的基态
+  - 哈密顿量期望 $ \left< \psi_0 | H | \psi_0 \right> $ = 最小特征值 $ \lambda_{min} $ = 基态能量 $ E $
+  - $ E $ 的误差来源
+    - H 的近似处理
+    - VQE 线路制备出来的不是 H 的基态本征态 $ \left| \psi_0 \right> $，能量会偏大
+    - 测量的精度有限 0.01 ~ 0.0001
 
 ### solution
 
@@ -34,7 +41,7 @@
 
 ⚪ baselines
 
-> truth $ E_{fci} $: -2.1663874486347625 for the default H4 1-2-3-4
+> truth $ E_{fci} = -2.166387 $, $ E_{hf} = -2.098546 $ for the default H4 1-2-3-4
 
 | method | score↑ (clean/noisy) | energy↓ (clean/noisy) | time (clean/noisy) | comment |
 | :-: | :-: | :-: | :-: | :-: |
@@ -54,13 +61,15 @@
 | 2024-05-09 17:57:33 | 5.512 | 5.9368 | HF, trim coeff < 1e-3, shots=100, n_meas=10 |
 | 2024-05-09 19:28:05 | 3.908 | 3.826  | ry_HEA, trim coeff < 1e-3, shots=100, n_meas=10 |
 | 2024-05-09 19:28:05 | 4.519 | 4.2442 | ry_HEA_no_HF, trim coeff < 1e-3, shots=100, n_meas=10 |
-| 2024-05-14 13:09:50 | 6~63 (方差很大) | 27.9413 (刷出来最高分) | HF, Z_only, shots=10, n_meas=10 |
+| 2024-05-14 13:09:50 | 6~63 | 27.9413 (刷出来最高分) | HF, Z_only, shots=10, n_meas=10 |
 | 2024-05-15 23:02:32 | 14.740 (非常固定) | 15.4219 | HF, Z_only (+exp_fix), shots=100 (**exactly $E_{HF}$**) |
 | 2024-05-16 23:19:04 | 15.317 | 17.0523 | ry_HEA, depth=3 (2/4 都不好), shots=100 |
 | 2024-05-16 23:21:33 |  8.426 | 13.4319 | ry_HEA, depth=3, shots=500 |
 | 2024-05-16 23:24:39 | 17.266 | 19.3466 | ry_HEA, depth=3, shots=1000 |
 | 2024-05-18 16:21:57 | 16.958 | 18.6189 | ry_HEA, depth=3, shots=3000 |
-| 2024-05-18 23:48:44 | 9.6134~25.224 (方差这么大?) | 7.924~87.441(??) | ry_HEA, depth=3, init=randn, optim=Adam, shots=1000 |
+| 2024-05-18 23:48:44 | 7.924~87.441 | 9.6134~25.224 | ry_HEA, depth=3, init=randn, optim=Adam, shots=1000 |
+| 2024-06-04 00:05:02 | 9~33 | 15.9935~47.1661 | HEA(RY), depth=3, init=randn, optim=Adam, shots=10000, combine_XY, rescaler |
+| 2024-06-04 16:44:04 | 8.038~26.389 | 32.0759 | HEA(RY), depth=2, init=randn, optim=Adam, shots=1000, combine_XY, rescaler |
 
 ### reference
 
