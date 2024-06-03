@@ -1,18 +1,5 @@
 @ECHO OFF
 
-:Q1_QSim
-
-
-:Q2_QAOA
-REM Parameter Setting in Quantum Approximate Optimization of Weighted Problems
-wget -nc https://arxiv.org/pdf/2305.15201.pdf
-REM Parameter Transfer for Quantum Approximate Optimization of Weighted MaxCut
-wget -nc https://arxiv.org/pdf/2201.11785.pdf
-REM The Quantum Approximate Optimization Algorithm at High Depth for MaxCut on Large-Girth Regular Graphs and the Sherrington-Kirkpatrick Model
-wget -nc https://arxiv.org/pdf/2110.14206.pdf
-
-
-:Q3_QAIA
 REM High-performance combinatorial optimization based on classical mechanics
 wget -nc https://www.researchgate.net/publication/349022706_High-performance_combinatorial_optimization_based_on_classical_mechanics/fulltext/60a30487458515952dd25638/High-performance-combinatorial-optimization-based-on-classical-mechanics.pdf
 REM Quadratic Unconstrained Binary Optimization via Quantum-Inspired Annealing

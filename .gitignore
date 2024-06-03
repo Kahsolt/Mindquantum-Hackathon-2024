@@ -2,12 +2,6 @@
 .vscode/
 __pycache__/
 
-# repo
-repo/*
-
-# thesis
-thesis/*
-!thesis/*.cmd
-
 # tmpl & submit
 *.zip
+pack.cmd
