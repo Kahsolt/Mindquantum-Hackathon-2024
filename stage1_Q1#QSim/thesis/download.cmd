@@ -8,3 +8,6 @@ wget -nc https://arxiv.org/pdf/1911.10864.pdf
 
 REM (CHC) Hardware Efficient Quantum Algorithms for Vibrational Structure Calculations
 wget -nc https://arxiv.org/pdf/2003.12578.pdf
+
+REM JW mapping
+wget -nc https://futureofmatter.com/assets/fermions_and_jordan_wigner.pdf

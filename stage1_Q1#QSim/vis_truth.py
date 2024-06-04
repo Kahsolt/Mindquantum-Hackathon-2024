@@ -2,6 +2,8 @@
 # Author: Armit
 # Create Time: 2024/05/01
 
+# 查看各种 H4 分子几何构型的真实基态能量
+
 import json
 from pathlib import Path
 

@@ -2,6 +2,8 @@
 # Author: Armit
 # Create Time: 2024/06/03 
 
+# 查看 CHC 线路结构
+
 from qiskit_nature.second_q.circuit.library.ansatzes.utils import generate_vibration_excitations
 from qiskit_nature.second_q.circuit.library.ansatzes.chc import CHC
 

@@ -435,7 +435,7 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     #circ = get_pchc_circuit(mol)               # seems not work
     circ = get_hae_ry_circit(mol, 3)
     #circ = get_hae_ry_compact_circit(mol, 3)   # a bit worse than the standard HEA(RY) =_=||
-    #circ = get_cnot_centric_circit(mol, 2)     # seems not work
+    #circ = get_cnot_centric_circit(mol)        # seems not work
     print('[circ]')
     print('   n_qubits:', circ.n_qubits)
     print('   n_gates:', len(circ))
@@ -460,28 +460,25 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     print('[params]:', repr(pr))
     pr_empty = ParameterResolver(dict(zip(circ.params_name, np.zeros(len(circ.params_name))))) if pr is not None else None
 
-    ''' Simulator '''
+    ''' Simulator (noiseless) '''
     from mindquantum.simulator import Simulator as OriginalSimulator
-    #sim = OriginalSimulator('mqvector', mol.n_qubits)
-    sim = Simulator('mqvector', mol.n_qubits)
+    sim = OriginalSimulator('mqvector', mol.n_qubits)
+    exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr).real
+    print('exp (full ham):', exp)
+    if pr_empty is not None:
+        exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr_empty).real
+        print('exp (full ham, zero param):', exp)
+    print('exp (per-term):')
+    for idx, (coeff, ops) in enumerate(split_ham):
+        exp = sim.get_expectation(Hamiltonian(ops), circ, pr=pr).real
+        print('coeff=', coeff, 'term=', ops, 'exp=', exp)
 
-    if not isinstance(sim, Simulator):
-        sim: OriginalSimulator
-        exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr).real
-        print('exp (full ham):', exp)
-        if pr_empty is not None:
-            exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr_empty).real
-            print('exp (full ham, zero param):', exp)
-        print('exp (per-term):')
-        for idx, (coeff, ops) in enumerate(split_ham):
-            exp = sim.get_expectation(Hamiltonian(ops), circ, pr=pr).real
-            print('coeff=', coeff, 'term=', ops, 'exp=', exp)
-
-    ''' Measure '''
+    ''' Measure (noisy) '''
     SHOTS = 1000
     USE_EXP_FIX = False
     N_MEAS = 1 if USE_EXP_FIX else 1
 
+    sim = Simulator('mqvector', mol.n_qubits)
     rescaler = estimate_rescaler(mol)
     if pr_empty is not None:
         result_ref = const + get_min_exp(sim, circ, pr_empty, split_ham, shots=SHOTS, n_repeat=N_MEAS, rescaler=rescaler, use_exp_fix=USE_EXP_FIX)
