@@ -53,11 +53,28 @@
 |                     | 20330.73329 |            | ft-ada; iter=1900, rescaler=1.275 |
 |                     | 20116.10485 |            | ft-ada; iter=2000, rescaler=1.275 |
 |                     | 19226.65152 |            | ft-ada-decay; iter=2000, rescaler=1.275 |
-|                     | 20368.31217 |            | ft-ada-decay; iter=3000, rescaler=1.275 |
-|                     | 20175.90654 |            | ft-ada-decay; iter=4000, rescaler=1.275 |
+| 2024-06-07 08:58:31 | 20368.31217 | 29747.6604 | ft-ada-decay; iter=3000, rescaler=1.275 |
+| 2024-06-07 08:59:38 | 20175.90654 | 29554.6544 | ft-ada-decay; iter=4000, rescaler=1.275 |
 | 2024-06-03 13:15:20 | 20696.82719 | 30072.2855 | ft-ada-decay; iter=5000, rescaler=1.275 |
-|                     | 20726.71913 |            | ft-ada-decay; iter=5500, rescaler=1.275 |
+| 2024-06-09 14:49:42 | 20726.71913 | 30100.7901 | ft-ada-decay; iter=5500, rescaler=1.275 |
 | 2024-06-03 12:40:58 | 20729.63455 | 30105.3792 | ft-ada-decay; iter=5600, rescaler=1.275 |
+|                     | 20802.38676 |            | ft-ada-decay; iter=6000, rescaler=1.275 |
+|                     | 20775.81853 |            | ft-ada-decay; iter=6100, rescaler=1.275 |
+|                     | 20703.96950 |            | ft-ada-decay; iter=6400, rescaler=1.275 |
+|                     | 20711.00992 |            | ft-ada-decay; iter=6500, rescaler=1.275 |
+|                     | 20797.86140 |            | ft-ada-decay; iter=6700, rescaler=1.275 |
+|                     | 20783.31786 |            | ft-ada-decay; iter=6900, rescaler=1.275 |
+|                     | 20814.45155 |            | ft-ada-decay; iter=7000, rescaler=1.275 |
+|                     | 20856.19912 |            | ft-ada-decay; iter=7100, rescaler=1.275 |
+|                     | 20778.53995 |            | ft-ada-decay; iter=7200, rescaler=1.275 |
+|                     | 20792.42218 |            | ft-ada-decay; iter=8000, rescaler=1.275 |
+|                     | 20824.90335 |            | ft-ada-decay; iter=9000, rescaler=1.275 |
+|                     | 20855.28777 |            | ft-ada-decay; iter=9300, rescaler=1.275 |
+|                     | 20948.34952 |            | ft-ada-decay; iter=9400, rescaler=1.275 |
+|                     | 20907.75227 |            | ft-ada-decay; iter=9500, rescaler=1.275 |
+|                     | 20863.27086 |            | ft-ada-decay; iter=9600, rescaler=1.275 |
+|                     | 20809.78942 |            | ft-ada-decay; iter=9700, rescaler=1.275 |
+|                     | 20827.82030 |            | ft-ada-decay; iter=10000, rescaler=1.275 |
 
 ℹ ft 是带着 rescaler=1.275 训练的，opt-avg 没有带
 
