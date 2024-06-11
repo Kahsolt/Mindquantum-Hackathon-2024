@@ -69,7 +69,8 @@
 | 2024-05-18 16:21:57 | 16.958 | 18.6189 | ry_HEA, depth=3, shots=3000 |
 | 2024-05-18 23:48:44 | 7.924~87.441 | 9.6134~25.224 | ry_HEA, depth=3, init=randn, optim=Adam, shots=1000 |
 | 2024-06-04 00:05:02 | 9~33 | 15.9935~47.1661 | HEA(RY), depth=3, init=randn, optim=Adam, shots=10000, combine_XY, rescaler |
-| 2024-06-04 16:44:04 | 8.038~26.389 | 32.0759 | HEA(RY), depth=2, init=randn, optim=Adam, shots=1000, combine_XY, rescaler |
+| 2024-06-04 16:44:04 | 8.038~26.389 | 32.0759~127.9223 | HEA(RY), depth=2, init=randn, optim=Adam, shots=1000, combine_XY, rescaler |
+| 2024-06-04 16:44:04 | 203.663 | 12.5186~320.646 | HEA(RY), depth=3, init=pretrained, optim=Adam(lr=1e-4), shots=1000, combine_XY, rescaler |
 
 ### reference
 

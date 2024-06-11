@@ -55,15 +55,7 @@ def run():
     circ = get_circ(mol)
 
     ''' Noiseless Optimize '''
-    fmin = 99999
-    fval = None
-    pr = None
-    for _ in range(N_OPTIM_TRIAL):
-      fval, pr_new = get_best_params(circ, ham, method='Adam', init='randn')
-      if fval < fmin:
-        fmin = fval
-        pr = pr_new
-    print('   best fval:', fval)
+    pr = get_best_params_repeat(circ, ham, method='Adam', init='randn', n_repeat=N_OPTIM_TRIAL)
     circ, pr = prune_circuit(circ, pr)
 
     ''' Noiseless Measure '''

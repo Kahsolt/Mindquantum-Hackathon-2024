@@ -33,8 +33,19 @@ from mindspore.nn.wrap.cell_wrapper import TrainOneStepCell
 from simulator import HKSSimulator
 from utils import generate_molecule, get_molecular_hamiltonian
 
+DEBUG_OPTIM = False
+DEBUG_OPTIM_VERBOSE = False
+
 R_str = Regex('\[([XYZ\d ]+)\]')
+Geometry = List[Tuple[str, List[float]]]
 PauliTerm = Tuple[float, QubitOperator]
+
+''' Molecule '''
+
+def geometry_move_to_center(geo:Geometry) -> Geometry:
+    center = np.stack([np.asarray(coord) for atom, coord in geo], axis=0).mean(axis=0)
+    return [(atom, (np.asarray(coord) - center).tolist()) for atom, coord in geo]
+
 
 ''' Ansatz '''
 
@@ -159,6 +170,8 @@ def get_cnot_centric_circit(mol, depth:int=1) -> Circuit:
 
 
 def prune_circuit(circ:Circuit, pr:ParameterResolver) -> Tuple[Circuit, ParameterResolver]:
+    if not len(circ.params_name) or pr is None: return circ, pr
+
     # TODO: circuit prune: removing 2*pi rotation gate, round pi fractions to non-parameter gate
     # sanitize
     to_keep: List[BasicGate] = []
@@ -290,62 +303,78 @@ def optim_sp(method:str, circ:Circuit, ham:Hamiltonian, p0:ndarray, tol:float=1e
         options.update({'rhobeg': 1.57})
     res = minimize(func, p0, (grad_ops,), method, jac=True, tol=tol, options=options)
 
-    print('min. fval:', res.fun)
-    #print('argmin. x:', res.x)
+    if DEBUG_OPTIM: print('min. fval:', res.fun)
+    if DEBUG_OPTIM_VERBOSE: print('argmin. x:', res.x)
     px = res.x
     if TRIM_P:
         px = trim_p(px, TRIM_P)
-        #print('argmin. x (trimmed):', px)
+        if DEBUG_OPTIM_VERBOSE: print('argmin. x (trimmed):', px)
     if NORM_P:
         px = norm_p(px)
-        #print('argmin. x (normed):', px)
+        if DEBUG_OPTIM_VERBOSE: print('argmin. x (normed):', px)
     return res.fun, ParameterResolver(dict(zip(circ.params_name, px)))
 
-def optim_ms(method:str, circ: Circuit, ham:Hamiltonian, p0:ndarray):
+def optim_ms(method:str, circ:Circuit, ham:Hamiltonian, p0:ndarray, lr:float=0.01):
+    ''' NoiseModel '''
+    from noise_model import generate_noise_model
+    noise_model = generate_noise_model()
+    circ = noise_model(circ)
     ''' Model & Optim '''
     sim = Simulator('mqvector', circ.n_qubits)
     grad_ops = sim.get_expectation_with_grad(ham, circ)
     net = MQAnsatzOnlyLayer(grad_ops)
     net.weight.data[:] = p0.tolist()
     if method == 'Adam':
-        opt = Adam(net.trainable_params(), learning_rate=0.01)
+        opt = Adam(net.trainable_params(), learning_rate=lr)
     elif method == 'SGD':
-        opt = SGD(net.trainable_params(), learning_rate=0.01, momentum=0.8)
+        opt = SGD(net.trainable_params(), learning_rate=lr, momentum=0.8)
     train_net = TrainOneStepCell(net, opt)
     ''' Train '''
     best_E = 99999
     best_weight = None
-    for i in range(2000):
+    for i in range(3000):
         E = train_net()
         if E < best_E:
             best_E = E
             best_weight = train_net.weights[0]
-        if i % 100 == 0:
+        if DEBUG_OPTIM and i % 100 == 0:
             print(f'[step {i}] expect: {E}')
     px = best_weight
+    return E.item(), ParameterResolver(dict(zip(circ.params_name, px)))
 
-    '''
-    px = [
-        -0.172711, 0.000000, 0.000000, -0.000000, 0.000000, 0.000000, 0.015735, -0.007540, -0.000000,
-        0.000000, 0.000000, -0.000000, -0.000000, -0.000001, 1.570925, 0.005027, -0.000000, 0.000000,
-        0.000081, 0.000000, 0.000000, 0.000054, 0.004083, 0.019818, 0.000000, -0.000007, -0.000000,
-        0.000000, 0.000000, 0.000256, -1.570796, 0.002514
-    ]
-    '''
-    return E, ParameterResolver(dict(zip(circ.params_name, px)))
-
-def get_best_params(circ: Circuit, ham:QubitOperator, method:str='BFGS', init:str='randu') -> Tuple[float, ParameterResolver]:
-    if init == 'zeros':
-        p0 = np.zeros(len(circ.params_name))
+def get_best_params(circ:Circuit, ham:QubitOperator, method:str='BFGS', init:str='randu') -> Tuple[float, ParameterResolver]:
+    n_params = len(circ.params_name)
+    from_pretrained = False
+    if isinstance(init, (ndarray, list)):
+        from_pretrained = True
+        assert len(init) == n_params
+        p0 = init
+    elif init == 'zeros':
+        p0 = np.zeros(n_params)
     elif init == 'randu':
-        p0 = np.random.uniform(-np.pi, np.pi, len(circ.params_name))
+        p0 = np.random.uniform(-np.pi, np.pi, n_params) * 0.1
     elif init == 'randn':
-        p0 = np.random.normal(0, 0.02, len(circ.params_name))
+        p0 = np.random.normal(0, 0.02, n_params)
 
     if method in ['BFGS', 'COBYLA']:
         return optim_sp(method, circ, Hamiltonian(ham), p0)
     else:
-        return optim_ms(method, circ, Hamiltonian(ham), p0)
+        lr = 0.0001 if from_pretrained else 0.01
+        return optim_ms(method, circ, Hamiltonian(ham), p0, lr)
+
+def get_best_params_repeat(circ:Circuit, ham:QubitOperator, method:str='BFGS', init:str='randu', n_repeat:int=10) -> ParameterResolver:
+    if not len(circ.params_name): return
+
+    fmin = 99999
+    pr = None
+    for idx in range(n_repeat):
+        fval, pr_new = get_best_params(circ, ham, method=method, init=init)
+        print(f'   trial-{idx} fval:', fval)
+        if fval < fmin:
+            fmin = fval
+            pr = pr_new
+    print('   best fval:', fmin)
+    return pr
 
 
 ''' Measure '''
@@ -370,7 +399,7 @@ def measure_single_ham(sim: Simulator, circ: Circuit, pr: ParameterResolver, ops
     return round(exp / shots, int(np.ceil(np.log10(shots))))
 
 def estimate_rescaler(mol) -> float:
-    # 测量门的比特翻转信道会使得测量值极差变小，尝试估计一下缩放比
+    # 去极化信道和比特翻转信道都会使得测量值极差变小，尝试估计一下(线性)缩放比
     sim = HKSSimulator('mqvector', n_qubits=mol.n_qubits)
     circ = Circuit()
     circ += X.on(0)
@@ -379,37 +408,37 @@ def estimate_rescaler(mol) -> float:
     exp_actual = measure_single_ham(sim, circ, None, ops, 10000)
     return exp_actual / exp_GT
 
-def get_min_exp(sim:Simulator, circ:Circuit, pr:ParameterResolver, split_ham:List[PauliTerm], shots:int=100, n_repeat:int=10, rescaler:float=1.0, use_exp_fix:bool=False) -> float:
-    result_min = 99999
-    for _ in range(n_repeat):
-        result = 0.0
-        with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
-            for idx, (coeff, ops) in enumerate(split_ham):
-                #n_prec = int(np.ceil(np.log10(1/abs(coeff))))
-                #var_shots = shots * 10**(n_prec-1)
-                var_shots = shots
-                exp = measure_single_ham(sim, circ, pr, ops, var_shots)
-                if use_exp_fix:     # for HF_circuit only
-                    # FIXME: when circ is non-entangled, and gates are all X
-                    # the BitFlip noise on measure gate could be cheaty moved out :)
-                    if   exp > +0.1: exp = +1
-                    elif exp < -0.1: exp = -1
-                    else:            exp = 0
-                print('coeff=', coeff, 'term=', ops, 'exp=', exp)
-                result += exp * coeff / rescaler
-                bar.update_loop(idx)
-        result_min = min(result_min, result)
-    return result_min
+def get_min_exp(sim:Simulator, circ:Circuit, pr:ParameterResolver, split_ham:List[PauliTerm], shots:int=100, rescaler:float=1.0, use_exp_fix:bool=False) -> float:
+    result = 0.0
+    with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
+        for idx, (coeff, ops) in enumerate(split_ham):
+            #n_prec = int(np.ceil(np.log10(1/abs(coeff))))
+            #var_shots = shots * 10**(n_prec-1)
+            var_shots = shots
+            exp = measure_single_ham(sim, circ, pr, ops, var_shots)
+
+            if use_exp_fix:     # for HF_circuit only
+                # FIXME: when circ is non-entangled, and gates are all X
+                # the BitFlip noise on measure gate could be cheaty moved out :)
+                if   exp > +0.1: exp = +1
+                elif exp < -0.1: exp = -1
+                else:            exp = 0
+
+            print('  coeff=', coeff, 'term=', ops, 'exp=', exp)
+            result += exp * coeff
+            bar.update_loop(idx)
+    return result / rescaler
 
 
 ''' Entry '''
 
 def solution(molecule, Simulator: HKSSimulator) -> float:
     ''' Molecule '''
-    molecule: List[Tuple[str, List[float]]]     # i.e.: geometry
+    molecule = geometry_move_to_center(molecule)
     mol = generate_molecule(molecule)
     print('[mol]')
     print('  name:', mol.name)
+    print('  geometry:', molecule)
     print('  n_atoms:', mol.n_atoms)
     print('  n_electrons:', mol.n_electrons)
     print('  n_orbitals:', mol.n_orbitals)
@@ -421,15 +450,16 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
 
     ''' Hamiltionian '''
     ham = get_molecular_hamiltonian(mol)
+    
     const, split_ham = split_hamiltonian(ham)
     print('[ham]')
     print('  const:', const)
     print('  n_terms:', len(split_ham))
     split_ham = prune_hamiltonian(split_ham)
     print('  n_terms (pruned):', len(split_ham))
-    #ham = combine_hamiltonian(const, split_ham)
+    #ham = combine_hamiltonian(const, split_ham)    # use precise ham for optimize accurate ground-state
 
-    ''' Circuit & Params '''
+    ''' Circuit '''
     #circ = get_HF_circuit(mol)                 # concrete noisy baseline
     #circ = get_uccsd_circuit(mol)              # concrete noiseless topline
     #circ = get_pchc_circuit(mol)               # seems not work
@@ -441,54 +471,69 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     print('   n_gates:', len(circ))
     print('   n_params:', len(circ.params_name))
     print(circ)
-    N_OPTIM_TRIAL = 3
-    fmin = 99999
-    fval = None
-    pr = None
-    if len(circ.params_name):
-        for _ in range(N_OPTIM_TRIAL):
-            fval, pr_new = get_best_params(circ, ham, method='Adam', init='randn')
-            if fval < fmin:
-                fmin = fval
-                pr = pr_new
-    print('   best fval:', fval)
-    if pr is not None:
-        circ, pr = prune_circuit(circ, pr)
+
+    ''' Optim & Params '''
+    N_OPTIM_TRIAL = 10
+    if 'from pretrained':
+        init = np.asarray([
+            1.22371875e-01,  1.66050064e-01, -1.08207624e-07,  4.15497272e-06,
+            2.97311960e-05,  -3.63897419e-06, -1.57081472e+00,  1.57079755e+00,
+            -4.92704293e-02, -1.38435013e-07, -6.27820153e-07,  1.38740712e-07,
+            9.15675847e-07,  -3.72413430e-06,  1.57079385e+00, -1.50730271e-05,
+            -5.40910224e-07, 2.70715532e-07, -3.36369100e-01, -6.03572356e-07,
+            2.97790996e-05,  1.08889993e-05,  1.57081228e+00,  1.50873326e-05,
+            5.32951353e-06,  3.89451753e-06, -1.39213793e-06, -3.12104716e-06,
+            -1.22848655e-06, -5.85945213e-06, -1.57079092e+00, -1.57079792e+00,
+        ])
+        init *= (np.abs(init) > 1e-5)
+    else:
+        init = 'randu'
+    pr = get_best_params_repeat(circ, ham, method='Adam', init=init, n_repeat=N_OPTIM_TRIAL)
+    print('   params:', repr(pr))
+    circ, pr = prune_circuit(circ, pr)
     print('   n_gates (pruned):', len(circ))
     print('   n_params (pruned):', len(circ.params_name))
     print(circ)
-    print('[params]:', repr(pr))
+    print('   params (pruned):', repr(pr))
     pr_empty = ParameterResolver(dict(zip(circ.params_name, np.zeros(len(circ.params_name))))) if pr is not None else None
 
     ''' Simulator (noiseless) '''
     from mindquantum.simulator import Simulator as OriginalSimulator
     sim = OriginalSimulator('mqvector', mol.n_qubits)
+    print('[simulator] (noiseless)')
     exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr).real
-    print('exp (full ham):', exp)
+    print('   exp (whole):', exp)
     if pr_empty is not None:
         exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr_empty).real
-        print('exp (full ham, zero param):', exp)
-    print('exp (per-term):')
-    for idx, (coeff, ops) in enumerate(split_ham):
+        print('   exp (whole, zero param):', exp)
+    print('   exp (per-term):')
+    for coeff, ops in split_ham:
         exp = sim.get_expectation(Hamiltonian(ops), circ, pr=pr).real
-        print('coeff=', coeff, 'term=', ops, 'exp=', exp)
+        print('     coeff=', coeff, 'term=', ops, 'exp=', exp)
 
-    ''' Measure (noisy) '''
+    ''' Hardware (noisy) '''
     SHOTS = 1000
-    USE_EXP_FIX = False
-    N_MEAS = 1 if USE_EXP_FIX else 1
+    USE_EXP_FIX = False   # only for HF_circuit
 
+    # noisy hardware
     sim = Simulator('mqvector', mol.n_qubits)
     rescaler = estimate_rescaler(mol)
-    if pr_empty is not None:
-        result_ref = const + get_min_exp(sim, circ, pr_empty, split_ham, shots=SHOTS, n_repeat=N_MEAS, rescaler=rescaler, use_exp_fix=USE_EXP_FIX)
-    else:
-        result_ref = mol.hf_energy
-    print('result_ref:', result_ref)
-    print('ref_shift:', mol.hf_energy - result_ref)
+    print('[hardware] (noisy)')
+    print('   rescaler:', rescaler)
 
-    result_vqc = const + get_min_exp(sim, circ, pr, split_ham, shots=SHOTS, n_repeat=N_MEAS, rescaler=rescaler, use_exp_fix=USE_EXP_FIX)
-    print('result_vqc:', result_vqc)
-    
+    # measure HF state
+    if pr_empty is not None:
+        result_hf = const + get_min_exp(sim, circ, pr_empty, split_ham, shots=SHOTS, rescaler=rescaler, use_exp_fix=USE_EXP_FIX)
+    else:
+        result_hf = mol.hf_energy
+    noise_shift = result_hf - mol.hf_energy
+    print(f'>> result_hf: {result_hf} (shift: {noise_shift})')
+
+    # measure optimized ansatz ground-state
+    result_vqe = const + get_min_exp(sim, circ, pr, split_ham, shots=SHOTS, rescaler=rescaler, use_exp_fix=USE_EXP_FIX)
+    print('>> result_vqe:', result_vqe)
+
     # Reference state error mitigation from https://pubs.acs.org/doi/10.1021/acs.jctc.2c00807
-    return result_vqc + (mol.hf_energy - result_ref)
+    result_fixed = result_vqe - noise_shift
+    print('>> result_fixed:', result_fixed)
+    return result_fixed
