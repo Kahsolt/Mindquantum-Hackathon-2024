@@ -105,7 +105,7 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | BSB   | 0.21630 | 234.09 |  0.7837 |         | B=100, n_iter=100 |
 | BSB   | 0.28433 |   1.16 |144.2781 |         | B=1, n_iter=10 |
 | BSB   | 0.39115 |   2.87 | 49.7056 |  0.6092 | B=1, n_iter=1 |
-| **LM_SB** | 0.18656 |  36.39 |  5.2332 |  4.9567 | B=10, n_iter=100; lowest BER |
+| LM_SB | 0.18656 |  36.39 |  5.2332 |  4.9567 | B=10, n_iter=100; lowest BER |
 | LM_SB | 0.18866 |  17.70 | 10.7307 |         | B=3, n_iter=100 |
 | LM_SB | 0.18867 |  11.71 | 16.2184 |         | B=1, n_iter=100 |
 | LM_SB | 0.19008 |  19.40 |  9.7726 |         | B=10, n_iter=50 |
@@ -118,6 +118,8 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | LM_SB | 0.27122 |   4.89 | 34.9137 |         | B=1, n_iter=4 |
 | LM_SB | 0.35360 |   5.34 | 28.3109 |         | B=1, n_iter=1 |
 | DU_LM_SB | 0.28677 | 5.59 | 29.8412 |  | B=1, n_iter=10, lr=0.01 |
+| DU_LM_SB | 0.20071 | 3.36 | 55.6981 |  | B=1, n_iter=10, lr=0.0001 (after profiling) |
+| **DU_LM_SB** | 0.19932 |      |         |  89.3023  | B=1, n_iter=10, lr=0.0001, optim_steps=100000 (after profiling) |
 | DU_LM_SB | 0.20111 | 5.73 | 32.6491 |  | B=1, n_iter=10, lr=0.01, overfit |
 | DU_LM_SB | 0.21522 | 8.50 | 21.6114 |  | B=1, n_iter=10, lr=0.01, overfit, update_hard |
 | DU_LM_SB | 0.21898 | 6.85 | 26.6877 |  | B=1, n_iter=10, lr=0.01, overfit, use essay c_0 |
@@ -128,11 +130,14 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | DU_LM_SB | 0.20049 | 2.89 | 64.8713 | 73.7797 | B=2, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20022 | 2.99 | 62.5865 |  | B=3, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20046 | 3.07 | 61.0498 |  | B=4, n_iter=10, lr=0.01, overfit (after profiling) |
-| **pReg_LM_SB** | 0.21701 | 2.95 | 62.0686 | 89.8824 | B=1, n_iter=10, lr=0.01; highest score (DU-method, non-cheaty) |
+| **pReg_LM_SB** | 0.19952 | | | 92.9875 | B=1, n_iter=10, lr=0.0001, optim_steps=100000; highest score (DU-method, non-cheaty) |
+| pReg_LM_SB | 0.20015 | | | | B=1, n_iter=10, lr=0.0001, optim_steps=50000, refined from `DU-LM-SB_T=10_lr=0.0001.pth` |
+| pReg_LM_SB | 0.21701 | 2.95 | 62.0686 | 89.8824 | B=1, n_iter=10, lr=0.01 |
 | pReg_LM_SB | 0.15602 | 3.60 | 54.9289 | 95.1233 | B=1, n_iter=10, lr=0.01, overfit |
 | pReg_LM_SB | 0.15584 | 3.66 | 54.0479 |  | B=2, n_iter=10, lr=0.01, overfit |
 | pReg_LM_SB | 0.15545 | 4.66 | 42.3943 |  | B=3, n_iter=10, lr=0.01, overfit |
 | ppReg_LM_SB | 0.2901 | 1.23 | 135.6155 |  | B=1, n_iter=10, lr=0.01 |
+| ppReg_LM_SB | 0.2422 | 1.40 | 126.5427 |  | B=1, n_iter=10, lr=0.0001, optim_steps=100000 (after profiling) |
 | **ppReg_LM_SB** | 0.15490 | 1.26 | 156.9497 | 137.3652 | B=1, n_iter=10, lr=0.01, overfit; highest score (DU-method, cheaty sense) |
 | pppReg_LM_SB | 0.27084 | 1.25 | 136.5777 | | B=1, n_iter=10, lr=0.01 |
 | pppReg_LM_SB | 0.20343 | 1.25 | 149.3551 | | B=1, n_iter=10, lr=0.01, overfit |

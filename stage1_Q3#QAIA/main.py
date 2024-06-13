@@ -11,12 +11,12 @@ from qaia import DUSB
 
 BASE_PATH = Path(__file__).parent
 LOG_PATH = BASE_PATH / 'log'
-DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=10_lr=0.01_overfit.json'
-pReg_LM_SB_weights = LOG_PATH / 'pReg-LM-SB_T=10_lr=0.01_overfit.pkl'
+DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=10_lr=0.0001.json'
+pReg_LM_SB_weights = LOG_PATH / 'pReg-LM-SB_T=10_lr=0.0001.pkl'
 ppReg_LM_SB_weights = LOG_PATH / 'ppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 pppReg_LM_SB_weights = LOG_PATH / 'pppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 
-run_cfg = 'ppReg_LM_SB'
+run_cfg = 'pReg_LM_SB'
 
 if run_cfg == 'DU_LM_SB':
     with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
