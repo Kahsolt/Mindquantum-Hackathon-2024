@@ -25,13 +25,15 @@
 
 ⚪ submits
 
+ℹ Possible max local score: 23654.99239
+
 | datetime | local score↑ | submit score↑ | comment |
 | :-: | :-: | :-: | :-: |
 | 2024-05-01 17:02:50 | 11730.14583 | 16627.496  | PT-WMC[1], reference, use $ γ^{inf} $ in stead of $ γ^{median} $ |
 | 2024-05-01 16:44:12 | 16526.79871 | 24999.9025 | PS-WP[2], baseline  |
 | 2024-05-06 23:09:02 | 17816.62534 | 27217.3001 | baseline, rescaler=1.275 |
-|                     | 18516.17254 |            | opt-avg |
-|                     | 16150.62844 |            | opt-avg, rescaler=1.275 |
+|                     | 18516.17254 |            | opt-avg, iter=10000, rescaler=1.0 |
+|                     | 16150.62844 |            | opt-avg, iter=10000, test with rescaler=1.275 |
 |                     | 18089.52401 |            | ft; iter=100, rescaler=1.275 |
 | 2024-05-07 18:28:59 | 18302.26568 | 27756.869  | ft; iter=200, rescaler=1.275 |
 | 2024-05-07 18:42:49 | 18183.73663 | 27645.5604 | ft; iter=300, rescaler=1.275 |
@@ -70,13 +72,12 @@
 |                     | 20792.42218 |            | ft-ada-decay; iter=8000, rescaler=1.275 |
 |                     | 20824.90335 |            | ft-ada-decay; iter=9000, rescaler=1.275 |
 |                     | 20855.28777 |            | ft-ada-decay; iter=9300, rescaler=1.275 |
-|                     | 20948.34952 |            | ft-ada-decay; iter=9400, rescaler=1.275 |
+| 2024-06-11 11:10:03 | 20948.34952 | 30332.7544 | ft-ada-decay; iter=9400, rescaler=1.275 |
 |                     | 20907.75227 |            | ft-ada-decay; iter=9500, rescaler=1.275 |
 |                     | 20863.27086 |            | ft-ada-decay; iter=9600, rescaler=1.275 |
 |                     | 20809.78942 |            | ft-ada-decay; iter=9700, rescaler=1.275 |
 |                     | 20827.82030 |            | ft-ada-decay; iter=10000, rescaler=1.275 |
-
-ℹ ft 是带着 rescaler=1.275 训练的，opt-avg 没有带
+|                     | 18027.36405 |            | opt-avg; iter=1000, rescaler=1.275 |
 
 ### reference
 

@@ -2,8 +2,9 @@
 # Author: Armit
 # Create Time: 2024/05/07 
 
-# 为每个样例寻找其最优参数
+# 为每个样例寻找其最优参数 (i.e. 刷分上限)
 
+import json
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -19,7 +20,7 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.path import DATA_OPT_PATH ; DATA_OPT_PATH.mkdir(exist_ok=True)
-from utils.lookup_table import load_lookup_table_original, dump_lookup_table
+from utils.lookup_table import load_lookup_table_original
 from utils.qcirc import qaoa_hubo, build_ham_high
 from score import load_data
 from main import ave_D, order, trans_gamma, rescale_factor
@@ -56,6 +57,7 @@ def train(args):
 
   ''' Optimize '''
   for fp, Jc_dict in tqdm(dataset):
+    if args.peek and fp not in fps_for_score: continue
     opt_params = {}
     for p in [4, 8]:
       # ham
@@ -129,16 +131,18 @@ def train(args):
     # save opt params
     save_fp: Path = DATA_OPT_PATH / fp.replace('data/', '')
     save_fp.parent.mkdir(exist_ok=True, parents=True)
-    dump_lookup_table(opt_params, save_fp)
+    with open(save_fp, 'w', encoding='utf-8') as fh:
+      json.dump(opt_params, fh, indent=2, ensure_ascii=False)
 
-  print(f'peek score: {score:.5f}') 
+  print(f'>> optimal possible score: {score:.5f}') 
 
 
 if __name__ == '__main__':
   parser = ArgumentParser()
   parser.add_argument('--steps', default=1000, type=int, help='optim steps per sample case')
   parser.add_argument('--lr', default=1e-4, type=float)
-  parser.add_argument('--rescaler', default=1.0, type=float, help='gamma rescaler')
+  parser.add_argument('--rescaler', default=1.275, type=float, help='gamma rescaler')
+  parser.add_argument('--peek', action='store_true', help='only peek for optimal score')
   args = parser.parse_args()
 
   train(args)
