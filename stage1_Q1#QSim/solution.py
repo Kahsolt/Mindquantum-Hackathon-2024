@@ -11,34 +11,43 @@ if 'env':
     warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
 from re import compile as Regex
+from copy import deepcopy
 from typing import *
 
 import numpy as np
 from numpy import ndarray
-from scipy.optimize import minimize
+from scipy.optimize import minimize, curve_fit
+import matplotlib.pyplot as plt
 
 from mindquantum.simulator import Simulator
 from mindquantum.core.operators import QubitOperator, Hamiltonian, TimeEvolution
 from mindquantum.core.gates import H, X, Y, Z, RX, RY, RZ, CNOT, BasicGate, ParameterGate, MeasureResult
-from mindquantum.core.circuit import Circuit, UN
+from mindquantum.core.circuit import Circuit, UN, dagger
 from mindquantum.core.parameterresolver import ParameterResolver
 from mindquantum.algorithm.nisq import Transform
 from mindquantum.utils.progress import SingleLoopProgress
 from mindquantum.third_party.unitary_cc import uccsd_singlet_generator
 from mindquantum.framework import MQAnsatzOnlyLayer
 from mindquantum import MQAnsatzOnlyLayer
+from mindspore import Tensor
 from mindspore.nn.optim import SGD, Adam
 from mindspore.nn.wrap.cell_wrapper import TrainOneStepCell
 
 from simulator import HKSSimulator
 from utils import generate_molecule, get_molecular_hamiltonian
 
-DEBUG_OPTIM = False
+SHOTS = 1000
+N_OPTIM_TRIAL = 10
+N_PRUNE = 2
+NOISE_AWARE_OPTIMIZE = False
+
+DEBUG_OPTIM = True
 DEBUG_OPTIM_VERBOSE = False
 
 R_str = Regex('\[([XYZ\d ]+)\]')
 Geometry = List[Tuple[str, List[float]]]
 PauliTerm = Tuple[float, QubitOperator]
+SplitHam = List[PauliTerm]
 
 ''' Molecule '''
 
@@ -168,14 +177,114 @@ def get_cnot_centric_circit(mol, depth:int=1) -> Circuit:
             circ += RY(f'd{d}_q{i}').on(i)
     return circ + get_HF_circuit(mol)
 
+def get_x_swap_circuit(mol) -> Circuit:
+    '''The X-SWAP(θ) circuit is like:
+        -----x-RY-o-RY-x---------------x-RY-o-RY-x--
+             |    |    |               |    |    |
+        -----|----|----|--x-RY-o-RY-x--o----x----o--
+             |    |    |  |    |    |
+        --X--|----|----|--o----x----o---------------
+             |    |    |
+        --X--o----x----o----------------------------
+        | swap low-high symmetrically | swap low linearly |
+    which is electron-preserving and symmetrical, and U(θ=0)|0000> = |0011> prepares the HF state :)
+    '''
+    def swap_theta_gate(i:int, j:int, l:str) -> Circuit:    # j is the control qubit
+        circ = Circuit()
+        circ += CNOT.on(i, j)
+        circ += RY(f'l{l}_ry_0').on(i)
+        circ += CNOT.on(j, i)
+        circ += RY(f'l{l}_ry_1').on(i)
+        circ += CNOT.on(i, j)
+        return circ
 
-def prune_circuit(circ:Circuit, pr:ParameterResolver) -> Tuple[Circuit, ParameterResolver]:
+    circ = Circuit()
+    nq_hf = mol.n_qubits // 2
+    for i in range(nq_hf, mol.n_qubits):
+        circ += X.on(i)
+    l = 0   # layer index
+    for i in range(nq_hf):  # symmetrically
+        circ += swap_theta_gate(i, mol.n_qubits - 1 - i, l)
+        l += 1
+    for i in range(nq_hf-2, -1, -1):  # linearly
+        circ += swap_theta_gate(i, i + 1, l)
+        l += 1
+    return circ
+
+def get_cnot_ry_seq_circuit(mol, depth:int=1) -> Circuit:
+    '''The CNOT-RY-symmetrical circuit is like:
+        --RY----------------x--RY--X--
+                            |
+        --RY---------x--RY--o------X--
+                     |
+        --RY--x--RY--o----------------
+              |
+        --RY--o-----------------------
+    '''
+    circ = Circuit()
+    for d in range(depth):
+        for q in range(mol.n_qubits):
+            circ += RY(f'd{d}_q{q}').on(q)
+        for q in range(mol.n_qubits - 1, 0, -1):
+            circ += CNOT.on(q - 1, q)
+            circ += RY(f'd{d}_q{q-1}').on(q - 1)
+    return circ + get_HF_circuit(mol)
+
+def get_cnot_ry_sym_circuit(mol) -> Circuit:
+    '''The CNOT-RY-symmetrical circuit is like:
+        --RY--x--RY--o--RY------------X--
+              |      |
+        --RY--|------|--x--RY--o--RY--X--
+              |      |  |      |
+        --RY--|------|--o------x--RY-----
+              |      |
+        --RY--o------x--RY---------------
+    '''
+    circ = Circuit()
+    nq_hf = mol.n_qubits // 2
+    for q in range(mol.n_qubits):
+        circ += RY(f'd0_q{q}').on(q)
+    l = 1   # layer index
+    for q in range(nq_hf):  # symmetrically
+        qq = mol.n_qubits - 1 - q
+        circ += CNOT.on(q, qq)
+        circ += RY(f'd{l}_q{q}').on(q)
+        circ += CNOT.on(qq, q)
+        circ += RY(f'd{l}_q{q}_r').on(q)
+        circ += RY(f'd{l}_q{q}_qq').on(qq)
+        l += 1
+    return circ + get_HF_circuit(mol)
+
+
+def get_hae_ry_circit_pretrained_params(depth:int=3) -> ndarray:
+    # taken from `make_init.py`
+    if depth == 2:
+        return np.asarray([
+            -7.50192089e-02, -5.39213019e-02, -1.57079946e+00,  2.57029659e-05,
+            4.03054967e-06,  1.57079719e+00, -1.57079635e+00,  1.57079295e+00,
+            1.16371583e-01, -5.40732159e-02,  1.57079701e+00,  1.25688645e+00,
+            1.57078841e+00,  1.57080158e+00,  6.29802784e-06, -3.14159249e+00,
+            -7.49089803e-02,  1.26923149e-06, -1.57076860e+00, -1.57080120e+00,
+            -1.31342775e-07,  2.79170030e-06, -1.57079048e+00,  1.57079944e+00,
+        ], np.float32)
+    if depth == 3:
+        return np.asarray([
+            1.22371875e-01,  1.66050064e-01, -1.08207624e-07,  4.15497272e-06,
+            2.97311960e-05,  -3.63897419e-06, -1.57081472e+00,  1.57079755e+00,
+            -4.92704293e-02, -1.38435013e-07, -6.27820153e-07,  1.38740712e-07,
+            9.15675847e-07,  -3.72413430e-06,  1.57079385e+00, -1.50730271e-05,
+            -5.40910224e-07, 2.70715532e-07, -3.36369100e-01, -6.03572356e-07,
+            2.97790996e-05,  1.08889993e-05,  1.57081228e+00,  1.50873326e-05,
+            5.32951353e-06,  3.89451753e-06, -1.39213793e-06, -3.12104716e-06,
+            -1.22848655e-06, -5.85945213e-06, -1.57079092e+00, -1.57079792e+00,
+        ], np.float32)
+
+def prune_circuit(circ:Circuit, pr:ParameterResolver, eps:float=1e-5) -> Tuple[Circuit, ParameterResolver]:
     if not len(circ.params_name) or pr is None: return circ, pr
 
-    # TODO: circuit prune: removing 2*pi rotation gate, round pi fractions to non-parameter gate
     # sanitize
     to_keep: List[BasicGate] = []
-    to_remove_keys: List[str] = [k for k in pr.keys() if abs(pr[k]) < 1e-6]
+    to_remove_keys: List[str] = [k for k in pr.keys() if abs(pr[k]) < eps]
     for gate in circ:
         gate: BasicGate
         if not gate.parameterized:
@@ -201,9 +310,9 @@ def prune_circuit(circ:Circuit, pr:ParameterResolver) -> Tuple[Circuit, Paramete
 
 ''' Hamiltonian '''
 
-def split_hamiltonian(ham: QubitOperator) -> Tuple[float, List[PauliTerm]]:
+def split_hamiltonian(ham:QubitOperator) -> Tuple[float, SplitHam]:
     const = 0.0
-    split_ham: List[PauliTerm] = []
+    split_ham: SplitHam = []
     for pr, ops in ham.split():
         if ops == 1:    # aka. I
             const = pr.const.real
@@ -211,14 +320,49 @@ def split_hamiltonian(ham: QubitOperator) -> Tuple[float, List[PauliTerm]]:
             split_ham.append([pr.const.real, ops])
     return const, split_ham
 
-def combine_hamiltonian(const: float, terms: List[PauliTerm]) -> QubitOperator:
+def combine_hamiltonian(const:float, terms:SplitHam) -> QubitOperator:
     ham = QubitOperator('', const)
     for coeff, ops in terms:
         string = R_str.findall(str(ops))[0]
         ham += QubitOperator(string, coeff)
     return ham
 
-def prune_hamiltonian(split_ham:List[PauliTerm]) -> List[PauliTerm]:
+def approx_merge_hamiltonian(split_ham:SplitHam) -> SplitHam:
+    # parse pauli string, each term has 0/2/4 count of Y
+    terms: List[Tuple[float, str]] = []
+    for coeff, ops in split_ham:
+        string = R_str.findall(str(ops))[0]
+        terms.append((coeff, string))
+    # ref: https://github.com/liwt31/QC-Contest-Demo
+    # fix phase raised by HF_ciruit when replace Y -> X
+    phases: List[int] = []
+    hf_state = '11110000'   # reversed of the bit order
+    for i, (coeff, string) in enumerate(terms):
+        phase = 1
+        for seg in string.split(' '):
+            sym = seg[0]
+            if sym != 'Y': continue
+            qid = int(seg[1:])
+            if hf_state[qid] == '1':
+                phase *= 1j
+            else:
+                phase *= -1j
+        assert phase.imag == 0
+        phases.append(phase.real)
+    assert len(phases) == len(terms)
+    # approx YY ~= XX, hence aggregate the coeffs
+    string_coeff: Dict[str, List[float]] = {}
+    for i, (coeff, string) in enumerate(terms):
+        string_XY = string.replace('Y', 'X')
+        if string_XY not in string_coeff:
+            string_coeff[string_XY] = []
+        string_coeff[string_XY].append(coeff * phases[i])
+    terms_agg: Dict[str, float] = {k: np.sum(v) for k, v in string_coeff.items()}
+    # convert to SplitHam
+    split_ham_combined = [[v, QubitOperator(k)] for k, v in terms_agg.items()]
+    return split_ham_combined
+
+def prune_hamiltonian(split_ham:SplitHam) -> SplitHam:
     from mindquantum._math.ops import QubitOperator as QubitOperator_
 
     def filter_Z_only(ops:QubitOperator) -> bool:   # for HF_circuit
@@ -228,42 +372,8 @@ def prune_hamiltonian(split_ham:List[PauliTerm]) -> List[PauliTerm]:
                     return False
         return True
 
-    def combine_XY(split_ham:List[PauliTerm]) -> List[PauliTerm]:
-        # parse pauli string of each term
-        terms: List[Tuple[float, str]] = []
-        for coeff, ops in split_ham:
-            string = R_str.findall(str(ops))[0]
-            terms.append((coeff, string))
-        # ref: https://github.com/liwt31/QC-Contest-Demo
-        # fix phase of Y raised by HF_ciruit
-        phases: List[int] = []
-        hf_state = '11110000'   # reversed of the bit order
-        for i, (coeff, string) in enumerate(terms):
-            phase = 1
-            for seg in string.split(' '):
-                sym = seg[0]
-                if sym != 'Y': continue
-                qid = int(seg[1:])
-                if hf_state[qid] == '1':
-                    phase *= 1j
-                else:
-                    phase *= -1j
-            phases.append(phase.real)
-        assert len(phases) == len(terms)
-        # presuming X-Y is the same, aggregate the coeffs
-        string_coeff: Dict[str, List[float]] = {}
-        for i, (coeff, string) in enumerate(terms):
-            string_XY = string.replace('X', 'Y')
-            if string_XY not in string_coeff:
-                string_coeff[string_XY] = []
-            string_coeff[string_XY].append(coeff * phases[i])
-        terms_agg: Dict[str, float] = {k: np.sum(v) for k, v in string_coeff.items()}
-        # convert to SplitHam
-        split_ham_combined = [[v, QubitOperator(k)] for k, v in terms_agg.items()]
-        return split_ham_combined
-
     #split_ham = [it for it in split_ham if filter_Z_only(it[1])]
-    split_ham = combine_XY(split_ham)
+    split_ham = approx_merge_hamiltonian(split_ham)
     split_ham = [it for it in split_ham if abs(it[0]) > 1e-2]
     split_ham.sort(key=lambda it: abs(it[0]), reverse=True)
     return split_ham
@@ -315,15 +425,11 @@ def optim_sp(method:str, circ:Circuit, ham:Hamiltonian, p0:ndarray, tol:float=1e
     return res.fun, ParameterResolver(dict(zip(circ.params_name, px)))
 
 def optim_ms(method:str, circ:Circuit, ham:Hamiltonian, p0:ndarray, lr:float=0.01):
-    ''' NoiseModel '''
-    from noise_model import generate_noise_model
-    noise_model = generate_noise_model()
-    circ = noise_model(circ)
     ''' Model & Optim '''
     sim = Simulator('mqvector', circ.n_qubits)
     grad_ops = sim.get_expectation_with_grad(ham, circ)
     net = MQAnsatzOnlyLayer(grad_ops)
-    net.weight.data[:] = p0.tolist()
+    net.weight.set_data(Tensor.from_numpy(p0))
     if method == 'Adam':
         opt = Adam(net.trainable_params(), learning_rate=lr)
     elif method == 'SGD':
@@ -332,20 +438,23 @@ def optim_ms(method:str, circ:Circuit, ham:Hamiltonian, p0:ndarray, lr:float=0.0
     ''' Train '''
     best_E = 99999
     best_weight = None
-    for i in range(3000):
+    for i in range(3000 * (3 if NOISE_AWARE_OPTIMIZE else 1)):
         E = train_net()
         if E < best_E:
             best_E = E
             best_weight = train_net.weights[0]
         if DEBUG_OPTIM and i % 100 == 0:
             print(f'[step {i}] expect: {E}')
-    px = best_weight
+    if best_weight is None: return
+    px = best_weight.numpy()
     return E.item(), ParameterResolver(dict(zip(circ.params_name, px)))
+
 
 def get_best_params(circ:Circuit, ham:QubitOperator, method:str='BFGS', init:str='randu') -> Tuple[float, ParameterResolver]:
     n_params = len(circ.params_name)
     from_pretrained = False
     if isinstance(init, (ndarray, list)):
+        print('>> from_pretrained :)')
         from_pretrained = True
         assert len(init) == n_params
         p0 = init
@@ -355,6 +464,12 @@ def get_best_params(circ:Circuit, ham:QubitOperator, method:str='BFGS', init:str
         p0 = np.random.uniform(-np.pi, np.pi, n_params) * 0.1
     elif init == 'randn':
         p0 = np.random.normal(0, 0.02, n_params)
+    p0 = p0.astype(dtype=np.float32)
+
+    if NOISE_AWARE_OPTIMIZE:
+        from noise_model import generate_noise_model
+        noise_model = generate_noise_model()
+        circ = noise_model(circ)
 
     if method in ['BFGS', 'COBYLA']:
         return optim_sp(method, circ, Hamiltonian(ham), p0)
@@ -362,24 +477,37 @@ def get_best_params(circ:Circuit, ham:QubitOperator, method:str='BFGS', init:str
         lr = 0.0001 if from_pretrained else 0.01
         return optim_ms(method, circ, Hamiltonian(ham), p0, lr)
 
-def get_best_params_repeat(circ:Circuit, ham:QubitOperator, method:str='BFGS', init:str='randu', n_repeat:int=10) -> ParameterResolver:
-    if not len(circ.params_name): return
-
-    fmin = 99999
-    pr = None
+def get_best_params_repeat(circ:Circuit, ham:QubitOperator, method:str='BFGS', init:str='randu', n_repeat:int=10, n_prune:int=-1) -> Union[ParameterResolver, Tuple[Circuit, ParameterResolver]]:
+    fval_best, pr_best = 99999, None
+    circ_original, circ_best = circ, circ    # save the original
     for idx in range(n_repeat):
-        fval, pr_new = get_best_params(circ, ham, method=method, init=init)
+        # primary optimize-record round
+        curp = init
+        circ = deepcopy(circ_original)
+        retvals = get_best_params(circ, ham, method=method, init=curp)
+        if not retvals: continue
+        fval, pr = retvals
         print(f'   trial-{idx} fval:', fval)
-        if fval < fmin:
-            fmin = fval
-            pr = pr_new
-    print('   best fval:', fmin)
-    return pr
+        if fval < fval_best: fval_best, pr_best = fval, pr
 
+        # secondary prune-optimize-record round
+        for stage in range(n_prune):
+            circ, pr = prune_circuit(circ, pr)
+            curp = np.asarray([pr[name] for name in circ.ansatz_params_name], dtype=np.float32)
+            print(circ)
+            print(curp)
+            retvals = get_best_params(circ, ham, method=method, init=curp)
+            if not retvals: continue
+            fval, pr = retvals
+            print(f'   trial-{idx}-prune-{stage} fval:', fval)
+            if fval <= fval_best: fval_best, pr_best, circ_best = fval, pr, circ
+
+    print('   best fval:', fval_best)
+    return (circ_best, pr_best) if n_prune > 0 else pr_best
 
 ''' Measure '''
 
-def rotate_to_z_axis_and_add_measure(circ: Circuit, ops: QubitOperator) -> Circuit:
+def rotate_to_z_axis_and_add_measure(circ:Circuit, ops:QubitOperator) -> Circuit:
     circ = circ.copy()
     assert ops.is_singlet
     for idx, o in list(ops.terms.keys())[0]:
@@ -390,7 +518,7 @@ def rotate_to_z_axis_and_add_measure(circ: Circuit, ops: QubitOperator) -> Circu
         circ.measure(idx)
     return circ
 
-def measure_single_ham(sim: Simulator, circ: Circuit, pr: ParameterResolver, ops: QubitOperator, shots:int=100) -> float:
+def measure_single_ham(sim:Simulator, circ:Circuit, pr:ParameterResolver, ops:QubitOperator, shots:int=100) -> float:
     circ_m = rotate_to_z_axis_and_add_measure(circ, ops)
     result: MeasureResult = sim.sampling(circ_m, pr, shots, seed=None)
     exp = 0.0
@@ -398,23 +526,15 @@ def measure_single_ham(sim: Simulator, circ: Circuit, pr: ParameterResolver, ops
         exp += (-1)**bits.count('1') * cnt
     return round(exp / shots, int(np.ceil(np.log10(shots))))
 
-def estimate_rescaler(mol) -> float:
-    # 去极化信道和比特翻转信道都会使得测量值极差变小，尝试估计一下(线性)缩放比
-    sim = HKSSimulator('mqvector', n_qubits=mol.n_qubits)
-    circ = Circuit()
-    circ += X.on(0)
-    ops = QubitOperator('Z0')
-    exp_GT = -1
-    exp_actual = measure_single_ham(sim, circ, None, ops, 10000)
-    return exp_actual / exp_GT
-
-def get_min_exp(sim:Simulator, circ:Circuit, pr:ParameterResolver, split_ham:List[PauliTerm], shots:int=100, rescaler:float=1.0, use_exp_fix:bool=False) -> float:
+def get_exp(sim:Simulator, circ:Circuit, pr:ParameterResolver, split_ham:SplitHam, shots:int=100, use_exp_fix:bool=False, debug_log:bool=False) -> float:
     result = 0.0
     with SingleLoopProgress(len(split_ham), '哈密顿量测量中') as bar:
         for idx, (coeff, ops) in enumerate(split_ham):
-            #n_prec = int(np.ceil(np.log10(1/abs(coeff))))
-            #var_shots = shots * 10**(n_prec-1)
-            var_shots = shots
+            if not 'use var_shots':
+                n_prec = int(np.ceil(np.log10(1/abs(coeff))))
+                var_shots = shots * 10**(n_prec-1)
+            else:
+                var_shots = shots
             exp = measure_single_ham(sim, circ, pr, ops, var_shots)
 
             if use_exp_fix:     # for HF_circuit only
@@ -424,17 +544,51 @@ def get_min_exp(sim:Simulator, circ:Circuit, pr:ParameterResolver, split_ham:Lis
                 elif exp < -0.1: exp = -1
                 else:            exp = 0
 
-            print('  coeff=', coeff, 'term=', ops, 'exp=', exp)
+            if debug_log: print('  coeff=', coeff, 'term=', ops, 'exp=', exp)
             result += exp * coeff
             bar.update_loop(idx)
-    return result / rescaler
+    return result
+
+
+''' Error Mitigation '''
+
+def zref_trim_circuit(circ:Circuit) -> Circuit:
+    ''' zero ref-state EM utils, remove all parameterized gates '''
+    circ_new = Circuit()
+    for gate in circ:
+        gate: BasicGate
+        if not gate.parameterized:
+            circ_new += gate
+    return circ_new
+
+def zne_repeat_circuit(circ:Circuit, n_repeat:int=1) -> Circuit:
+    ''' ZNE EM utils, expand circuit by append each gate G with [G.dagger - G]*n_repeat, the noise should be amplified 2*n_repeat times additively '''
+    circ_new = Circuit()
+    for gate in circ:
+        gate: BasicGate
+        for _ in range(n_repeat):
+            circ_new += gate.hermitian()
+            circ_new += gate
+        circ_new += gate     # make circuit symmetrical & beautiful :)
+    return circ_new
+
+def estimate_rescaler(mol, shots:int=10000) -> float:
+    # 去极化信道和比特翻转信道宏观上都会使得测量值极差变小，尝试估计一下(线性)缩放比
+    sim = HKSSimulator('mqvector', n_qubits=mol.n_qubits)
+    circ = Circuit()
+    circ += X.on(0)
+    ops = QubitOperator('Z0')
+    exp_GT = -1
+    exp_actual = measure_single_ham(sim, circ, None, ops, shots)
+    return exp_actual / exp_GT
 
 
 ''' Entry '''
 
+# keep signature!!
 def solution(molecule, Simulator: HKSSimulator) -> float:
     ''' Molecule '''
-    molecule = geometry_move_to_center(molecule)
+    #molecule = geometry_move_to_center(molecule)
     mol = generate_molecule(molecule)
     print('[mol]')
     print('  name:', mol.name)
@@ -466,6 +620,9 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     circ = get_hae_ry_circit(mol, 3)
     #circ = get_hae_ry_compact_circit(mol, 3)   # a bit worse than the standard HEA(RY) =_=||
     #circ = get_cnot_centric_circit(mol)        # seems not work
+    #circ = get_x_swap_circuit(mol)
+    #circ = get_cnot_ry_seq_circuit(mol, 1)
+    #circ = get_cnot_ry_sym_circuit(mol)
     print('[circ]')
     print('   n_qubits:', circ.n_qubits)
     print('   n_gates:', len(circ))
@@ -473,29 +630,20 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     print(circ)
 
     ''' Optim & Params '''
-    N_OPTIM_TRIAL = 10
     if 'from pretrained':
-        init = np.asarray([
-            1.22371875e-01,  1.66050064e-01, -1.08207624e-07,  4.15497272e-06,
-            2.97311960e-05,  -3.63897419e-06, -1.57081472e+00,  1.57079755e+00,
-            -4.92704293e-02, -1.38435013e-07, -6.27820153e-07,  1.38740712e-07,
-            9.15675847e-07,  -3.72413430e-06,  1.57079385e+00, -1.50730271e-05,
-            -5.40910224e-07, 2.70715532e-07, -3.36369100e-01, -6.03572356e-07,
-            2.97790996e-05,  1.08889993e-05,  1.57081228e+00,  1.50873326e-05,
-            5.32951353e-06,  3.89451753e-06, -1.39213793e-06, -3.12104716e-06,
-            -1.22848655e-06, -5.85945213e-06, -1.57079092e+00, -1.57079792e+00,
-        ])
-        init *= (np.abs(init) > 1e-5)
+        init = get_hae_ry_circit_pretrained_params(depth=3)
+        #init *= (np.abs(init) > 1e-5)
     else:
-        init = 'randu'
-    pr = get_best_params_repeat(circ, ham, method='Adam', init=init, n_repeat=N_OPTIM_TRIAL)
+        init = 'randn'
+    assert circ.ansatz_params_name, 'non-parametrized ansatz (e.g. HF_circuit) is no more supported :/'
+    circ, pr = get_best_params_repeat(circ, ham, method='Adam', init=init, n_repeat=N_OPTIM_TRIAL, n_prune=0 if NOISE_AWARE_OPTIMIZE else N_PRUNE)
     print('   params:', repr(pr))
     circ, pr = prune_circuit(circ, pr)
     print('   n_gates (pruned):', len(circ))
     print('   n_params (pruned):', len(circ.params_name))
     print(circ)
     print('   params (pruned):', repr(pr))
-    pr_empty = ParameterResolver(dict(zip(circ.params_name, np.zeros(len(circ.params_name))))) if pr is not None else None
+    pr_empty = ParameterResolver(dict(zip(circ.params_name, np.zeros(len(circ.params_name)))))
 
     ''' Simulator (noiseless) '''
     from mindquantum.simulator import Simulator as OriginalSimulator
@@ -506,34 +654,63 @@ def solution(molecule, Simulator: HKSSimulator) -> float:
     if pr_empty is not None:
         exp = sim.get_expectation(Hamiltonian(ham), circ, pr=pr_empty).real
         print('   exp (whole, zero param):', exp)
-    print('   exp (per-term):')
-    for coeff, ops in split_ham:
-        exp = sim.get_expectation(Hamiltonian(ops), circ, pr=pr).real
-        print('     coeff=', coeff, 'term=', ops, 'exp=', exp)
+    #print('   exp (per-term):')
+    #for coeff, ops in split_ham:
+    #    exp = sim.get_expectation(Hamiltonian(ops), circ, pr=pr).real
+    #    print('     coeff=', coeff, 'term=', ops, 'exp=', exp)
 
     ''' Hardware (noisy) '''
-    SHOTS = 1000
-    USE_EXP_FIX = False   # only for HF_circuit
-
-    # noisy hardware
     sim = Simulator('mqvector', mol.n_qubits)
     rescaler = estimate_rescaler(mol)
     print('[hardware] (noisy)')
     print('   rescaler:', rescaler)
 
-    # measure HF state
-    if pr_empty is not None:
-        result_hf = const + get_min_exp(sim, circ, pr_empty, split_ham, shots=SHOTS, rescaler=rescaler, use_exp_fix=USE_EXP_FIX)
-    else:
-        result_hf = mol.hf_energy
-    noise_shift = result_hf - mol.hf_energy
-    print(f'>> result_hf: {result_hf} (shift: {noise_shift})')
+    # measure pure HF-state: HF
+    #result_hf = get_exp(sim, get_HF_circuit(mol), None, split_ham, shots=SHOTS)
+    #print(f'>> result_hf:', result_hf)
+    # measure no-param ansatz-state: CNOT+HF
+    #result_vqe_np = get_exp(sim, zref_trim_circuit(circ), None, split_ham, shots=SHOTS)
+    #print(f'>> result_vqe_np:', result_vqe_np)
 
-    # measure optimized ansatz ground-state
-    result_vqe = const + get_min_exp(sim, circ, pr, split_ham, shots=SHOTS, rescaler=rescaler, use_exp_fix=USE_EXP_FIX)
+    # measure optimized ansatz-state: RY(θ)+CNOT+HF
+    result_vqe = get_exp(sim, circ, pr, split_ham, shots=SHOTS)
     print('>> result_vqe:', result_vqe)
+    # measure zero-param ansatz-state: RY(0)+CNOT+HF
+    result_vqe_zp = get_exp(sim, circ, pr_empty, split_ham, shots=SHOTS)
+    print(f'>> result_vqe_zp:', result_vqe_zp)
 
     # Reference state error mitigation from https://pubs.acs.org/doi/10.1021/acs.jctc.2c00807
-    result_fixed = result_vqe - noise_shift
-    print('>> result_fixed:', result_fixed)
-    return result_fixed
+    result_rem = mol.hf_energy + (result_vqe - result_vqe_zp) / rescaler
+    print('>> rem:', result_rem)
+    return result_rem
+
+    def zne(y):
+        x = [1, 2, 3, 4]        # FIXME: this is wrong but it works :(
+        f = lambda x, k, b: k * x + b
+        popt, pcov = curve_fit(f, x, y)
+        return f(0, *popt)
+
+    # measure ZNE*k optimized ansatz-state: [RY(θ)+CNOT+HF]*k
+    result_vqe_1 = get_exp(sim, zne_repeat_circuit(circ, n_repeat=1), pr, split_ham, shots=SHOTS)
+    print(f'>> result_vqe_1:', result_vqe_1)
+    result_vqe_2 = get_exp(sim, zne_repeat_circuit(circ, n_repeat=2), pr, split_ham, shots=SHOTS)
+    print(f'>> result_vqe_2:', result_vqe_2)
+    result_vqe_3 = get_exp(sim, zne_repeat_circuit(circ, n_repeat=3), pr, split_ham, shots=SHOTS)
+    print(f'>> result_vqe_3:', result_vqe_3)
+    result_vqe_0 = zne([result_vqe, result_vqe_1, result_vqe_2, result_vqe_3])
+    print(f'>> result_vqe_0:', result_vqe_0)
+
+    # measure ZNE*k zero-param ansatz-state: [RY(0)+CNOT+HF]*k
+    result_vqe_zp_1 = get_exp(sim, zne_repeat_circuit(circ, n_repeat=1), pr_empty, split_ham, shots=SHOTS)
+    print(f'>> result_vqe_zp_1:', result_vqe_zp_1)
+    result_vqe_zp_2 = get_exp(sim, zne_repeat_circuit(circ, n_repeat=2), pr_empty, split_ham, shots=SHOTS)
+    print(f'>> result_vqe_zp_2:', result_vqe_zp_2)
+    result_vqe_zp_3 = get_exp(sim, zne_repeat_circuit(circ, n_repeat=3), pr_empty, split_ham, shots=SHOTS)
+    print(f'>> result_vqe_zp_3:', result_vqe_zp_3)
+    result_vqe_zp_0 = zne([result_vqe_zp, result_vqe_zp_1, result_vqe_zp_2, result_vqe_zp_3])
+    print(f'>> result_vqe_zp_0:', result_vqe_zp_0)
+
+    # Reference state error mitigation + zero noise extrapolation + rescaling
+    result_rem_zne = mol.hf_energy + (result_vqe_0 - result_vqe_zp_0) / rescaler
+    print('>> rem_zne:', result_rem_zne)
+    return result_rem_zne

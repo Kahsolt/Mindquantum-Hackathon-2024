@@ -5,6 +5,27 @@
 # 测试各线路性能：无噪优化，含噪测量，找到最优ansatz
 #  - HEA(3) 能制备较为准确的态，也相对抗噪
 #  - CC(1) 就能制备很准确的态了，但含噪条件下比 HAE(3) 差 (why?)
+#  - 啊啊啊啊啊，我复现不出来 HEA(3)=0.9999 的保真度了，怎么会事呢！！！
+
+'''
+TODO: 为 H4 这个特定问题捏造一个(不自然但)高效的 ansatz？
+- 据 vis_hamiltonian 显示，真实基态的振幅只有 20 个非零项，且 H4 分子键长的改变只会微小改变项的系数，不会改变项的有无（大概吧？
+- 据 benchmark_ansatz 显示，HAE(RY, depth=3) 可以比较好地近似其中 13 项，还是有系数错误很大的项
+- 据 make_init 显示，预训练权重中很多 RY(pi/2) 这意味着一些 CNOT 可能是冗余的（？
+主要振幅12项，它们居然是对称/共轭的
+  |00001111>  |11110000>
+  |00110011>  |11001100>
+  |00111100>  |11000011>
+  |01011010>  |10100101>
+  |01101001>  |10010110>
+  |01100110>  |10011001>
+考虑是否能设计一种 ansatz 满足条件:
+  - electron-preserving: 保持电子数
+    - X + SWAP(θ), 但 SWAP(θ) = CNOT + RY-RZ + revCNOT + RY-RZ + CNOT，线路太深了
+  - symmetrcial: 只能生成对称项加和形式，且允许对称项振幅不相等
+    - 两比特纠缠门只放置在对称位置
+  - HF-embedded: 嵌入了/潜在地含有一个 HF 线路
+'''
 
 import pickle as pkl
 from pathlib import Path
@@ -20,10 +41,12 @@ save_fp = IMG_PATH / f'{Path(__file__).stem}.pkl'
 save_img_fp = IMG_PATH / f'{Path(__file__).stem}.png'
 
 ANSATZS = {
-  **{f'HAE({i})':       lambda mol: get_hae_ry_circit        (mol, i) for i in range(1, 6+1)},
-  **{f'HAEc({i})':      lambda mol: get_hae_ry_compact_circit(mol, i) for i in range(1, 6+1)},
-  **{f'CC({i})':        lambda mol: get_cnot_centric_circit  (mol, i) for i in range(1, 6+1)},
-  **{f'pCHC({i}, {t})': lambda mol: get_pchc_circuit         (mol, i, t) for i in range(2, 4+1) for t in ['s', 'd', 'sd']},
+  **{f'HAE({i})':         lambda mol: get_hae_ry_circit        (mol, i) for i in range(1, 4+1)},
+  **{f'HAEc({i})':        lambda mol: get_hae_ry_compact_circit(mol, i) for i in range(1, 4+1)},
+  **{f'CC({i})':          lambda mol: get_cnot_centric_circit  (mol, i) for i in range(1, 4+1)},
+  'X-SWAP':               lambda mol: get_x_swap_circuit       (mol),
+  'CNOT-RY-sym':          lambda mol: get_cnot_ry_sym_circuit  (mol),
+  **{f'CNOT-RY-seq({i})': lambda mol: get_cnot_ry_seq_circuit  (mol, i) for i in range(1, 4+1)},
 }
 
 def run():
@@ -48,7 +71,7 @@ def run():
 
   ''' Experiments '''
   N_SHOTS = 1000
-  N_OPTIM_TRIAL = 5
+  N_OPTIM_TRIAL = 10
   for name, get_circ in tqdm(ANSATZS.items()):
     if name in stats: continue
     print(f'[{name}]')
@@ -83,7 +106,9 @@ def run():
       'E_ideal': exp_ideal,
       'E_noisy': exp_qmeas,
       'E_noisy_ref': exp_qmeas_ref,
+      'pr': pr.dumps(),
     }
+    print(stats[name])
 
     with open(save_fp, 'wb') as fh:
       pkl.dump(stats, fh)
