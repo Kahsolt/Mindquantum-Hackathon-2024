@@ -7,8 +7,8 @@ from scipy.interpolate import interp1d
 from utils.path import LOG_PATH
 from utils.lookup_table import load_lookup_table
 
-#lookup_table = load_lookup_table(LOG_PATH / 'lookup_table-optimal-avg.json')
-lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay' / 'lookup_table-iter=9400.json')
+#lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay' / 'lookup_table-iter=9400.json')
+lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay-moment-fast' / 'lookup_table-iter=3800.json')
 
 
 def ave_D(Jc, nq):      # average degree

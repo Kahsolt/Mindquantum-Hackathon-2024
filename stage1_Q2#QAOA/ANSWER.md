@@ -78,6 +78,17 @@
 |                     | 20809.78942 |            | ft-ada-decay; iter=9700, rescaler=1.275 |
 |                     | 20827.82030 |            | ft-ada-decay; iter=10000, rescaler=1.275 |
 |                     | 18027.36405 |            | opt-avg; iter=1000, rescaler=1.275 |
+|                     | 19479.14675 |            | ft-ada-decay-moment-fast; iter=1400, rescaler=1.275 |
+|                     | 19926.67130 |            | ft-ada-decay-moment-fast; iter=2000, rescaler=1.275 |
+|                     | 19905.01599 |            | ft-ada-decay-moment-fast; iter=3000, rescaler=1.275 |
+|                     | 19995.16122 |            | ft-ada-decay-moment-fast; iter=3700, rescaler=1.275 |
+|                     | 20381.14635 |            | ft-ada-decay-moment-fast; iter=3800, rescaler=1.275 |
+|                     | 20145.42843 |            | ft-ada-decay-moment-fast; iter=3900, rescaler=1.275 |
+|                     | 20159.19957 |            | ft-ada-decay-moment-fast; iter=4000, rescaler=1.275 |
+|                     | 20377.47218 |            | ft-ada-decay-moment-fast; iter=4500, rescaler=1.275 |
+|                     | 20326.20533 |            | ft-ada-decay-moment-fast; iter=4600, rescaler=1.275 |
+|                     |             |            | ft-ada-decay-moment-fast; iter=4700, rescaler=1.275 |
+|                     | 19755.98407 |            | ft-ada-decay-moment-fast; iter=4900, rescaler=1.275 |
 
 ### reference
 

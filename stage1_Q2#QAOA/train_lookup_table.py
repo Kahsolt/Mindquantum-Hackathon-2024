@@ -12,7 +12,6 @@ import mindspore as ms
 import mindspore.ops.functional as F
 from mindspore.nn.optim import Adam
 from mindspore.nn import TrainOneStepCell
-from mindspore import context
 from mindquantum.simulator import Simulator
 from mindquantum.core.operators import Hamiltonian
 from mindquantum.framework import MQAnsatzOnlyLayer
@@ -25,8 +24,7 @@ from utils.qcirc import qaoa_hubo, build_ham_high
 from score import load_data
 from main import ave_D, order, trans_gamma, rescale_factor
 
-context.set_context(device_target='CPU', mode=ms.PYNATIVE_MODE, pynative_synchronize=True)
-
+ms.set_context(device_target='CPU', mode=ms.PYNATIVE_MODE, pynative_synchronize=True)
 
 R_ITER = Regex('iter=(\d+)')
 
@@ -44,16 +42,22 @@ def train(args):
   ''' Ckpt '''
   if args.load:
     lookup_table = load_lookup_table(args.load)
+    lookup_table_moment = {}
     try:
       init_iter = int(R_ITER.findall(args.load)[0])
     except:
       init_iter = 0
   else:
     lookup_table = load_lookup_table_original()
+    lookup_table_moment = {}
     init_iter = 0
     save_fp = LOG_PATH / 'lookup_table-original.json'
     if not save_fp.exists():
       dump_lookup_table(lookup_table, save_fp)
+  
+  ''' Save '''
+  save_dp = (LOG_PATH / args.name) if args.name else LOG_PATH
+  save_dp.mkdir(exist_ok=True)
 
   ''' Simulator '''
   Nq = 12
@@ -128,14 +132,20 @@ def train(args):
     dx_decay = args.dx_decay ** (init_iter // args.dx_decay_every)
     ΔE = E_before - E_after
     lr = args.dx * dx_decay * np.log1p(ΔE)
-    lookup_table[p][k] = (1 - lr) * params + lr * tuned_params
+    if args.momentum:
+      if p not in lookup_table_moment: lookup_table_moment[p] = {}
+      if k not in lookup_table_moment[p]: lookup_table_moment[p][k] = tuned_params.copy()
+      lookup_table_moment[p][k] = (1 - args.momentum) * lookup_table_moment[p][k] + args.momentum * tuned_params
+      lookup_table[p][k] = (1 - lr) * params + lr * lookup_table_moment[p][k]
+    else:
+      lookup_table[p][k] = (1 - lr) * params + lr * tuned_params
 
     # tmp ckpt
     if (iter + 1) % 100 == 0:
-      dump_lookup_table(lookup_table, LOG_PATH / f'lookup_table-iter={iter+1}.json')
+      dump_lookup_table(lookup_table, save_dp / f'lookup_table-iter={iter+1}.json')
 
   ''' Ckpt '''
-  dump_lookup_table(lookup_table, LOG_PATH / 'lookup_table.json')
+  dump_lookup_table(lookup_table, save_dp / 'lookup_table.json')
 
 
 if __name__ == '__main__':
@@ -146,8 +156,10 @@ if __name__ == '__main__':
   parser.add_argument('--dx', default=0.1, type=float)
   parser.add_argument('--dx_decay', default=0.98, type=float)
   parser.add_argument('--dx_decay_every', default=100, type=int)
+  parser.add_argument('--momentum', default=0.0, type=float, help='impact of of the new param, >= 0.6 recommended')
   parser.add_argument('--rescaler', default=1.275, type=float, help='gamma rescaler')
   parser.add_argument('--load')
+  parser.add_argument('--name')
   args = parser.parse_args()
 
   train(args)

@@ -29,16 +29,16 @@ context.set_context(device_target='CPU', mode=ms.PYNATIVE_MODE, pynative_synchro
 
 
 def train(args):
-  ''' Data '''
-  if 'peek score':
-    score = 0
-    fps_for_score = []
-    for propotion in [0.3, 0.9]:
-      for k in range(2, 5):
-          for coef in ['std', 'uni', 'bimodal']:
-              for r in range(5):
-                  fps_for_score.append(f"data/k{k}/{coef}_p{propotion}_{r}.json")
+  ''' Data (check) '''
+  score = 0
+  fps_for_score = []
+  for propotion in [0.3, 0.9]:
+    for k in range(2, 5):
+        for coef in ['std', 'uni', 'bimodal']:
+            for r in range(5):
+                fps_for_score.append(f"data/k{k}/{coef}_p{propotion}_{r}.json")
 
+  ''' Data '''
   dataset = []
   for propotion in [0.3, 0.6, 0.9]:
     for k in range(2, 6):
@@ -134,7 +134,7 @@ def train(args):
     with open(save_fp, 'w', encoding='utf-8') as fh:
       json.dump(opt_params, fh, indent=2, ensure_ascii=False)
 
-  print(f'>> optimal possible score: {score:.5f}') 
+  print(f'>> optimal possible score: {score:.5f}')  # 23654.99239
 
 
 if __name__ == '__main__':

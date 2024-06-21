@@ -64,6 +64,8 @@ def plot_lookup_table(lookup_table:LookupTable, subfolder:str='original'):
 
   for p in sorted(lookup_table):
     if p not in DEPTH_LIMIT: continue
+    save_fp = save_dp / f'p={p}.png'
+    if save_fp.exists(): continue
 
     plt.clf()
     for k in sorted(lookup_table[p]):
@@ -71,7 +73,7 @@ def plot_lookup_table(lookup_table:LookupTable, subfolder:str='original'):
     plt.legend()
     plt.suptitle(f'p={p}')
     plt.tight_layout()
-    plt.savefig(save_dp / f'p={p}.png', dpi=400)
+    plt.savefig(save_fp, dpi=400)
     plt.close()
 
 
