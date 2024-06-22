@@ -5,6 +5,7 @@
 # 微调预制表 (Euler step 方法)
 
 import random
+from copy import deepcopy
 from re import compile as Regex
 from argparse import ArgumentParser
 
@@ -19,7 +20,7 @@ import numpy as np
 from tqdm import tqdm
 
 from utils.path import LOG_PATH
-from utils.lookup_table import load_lookup_table_original, load_lookup_table, dump_lookup_table
+from utils.lookup_table import load_lookup_table_original, load_lookup_table, dump_lookup_table, load_lookup_table_ex, dump_lookup_table_ex, SIM_EQ, NON_EQ
 from utils.qcirc import qaoa_hubo, build_ham_high
 from score import load_data
 from main import ave_D, order, trans_gamma, rescale_factor
@@ -27,6 +28,7 @@ from main import ave_D, order, trans_gamma, rescale_factor
 ms.set_context(device_target='CPU', mode=ms.PYNATIVE_MODE, pynative_synchronize=True)
 
 R_ITER = Regex('iter=(\d+)')
+THRESHOLD = 1.0
 
 
 def train(args):
@@ -40,20 +42,43 @@ def train(args):
           dataset.append(Jc_dict)
 
   ''' Ckpt '''
-  if args.load:
-    lookup_table = load_lookup_table(args.load)
-    lookup_table_moment = {}
-    try:
-      init_iter = int(R_ITER.findall(args.load)[0])
-    except:
-      init_iter = 0
+  if args.ex:
+    if not args.load and not args.load_base:
+      raise ValueError('>> you must start from some pretrained weights, fresh training is not supported yet.')
+    if args.load:
+      lookup_table_ex = load_lookup_table_ex(args.load)
+      lookup_table_ex_moment = {}
+      try:
+        init_iter = int(R_ITER.findall(args.load)[0])
+      except:
+        init_iter = 0
+    elif args.load_base:
+      lookup_table = load_lookup_table(args.load_base)
+      lookup_table_ex = {
+        SIM_EQ: deepcopy(lookup_table),    # std(weights) <= THRESHOLD, for near-equal edge weights
+        NON_EQ: deepcopy(lookup_table),    # std(weights) > THRESHOLD, for non-equal edge weights
+      }
+      lookup_table_ex_moment = {}
+      del lookup_table
+      try:
+        init_iter = int(R_ITER.findall(args.load_base)[0])
+      except:
+        init_iter = 0
   else:
-    lookup_table = load_lookup_table_original()
-    lookup_table_moment = {}
-    init_iter = 0
-    save_fp = LOG_PATH / 'lookup_table-original.json'
-    if not save_fp.exists():
-      dump_lookup_table(lookup_table, save_fp)
+    if args.load:
+      lookup_table = load_lookup_table(args.load)
+      lookup_table_moment = {}
+      try:
+        init_iter = int(R_ITER.findall(args.load)[0])
+      except:
+        init_iter = 0
+    else:
+      lookup_table = load_lookup_table_original()
+      lookup_table_moment = {}
+      init_iter = 0
+      save_fp = LOG_PATH / 'lookup_table-original.json'
+      if not save_fp.exists():
+        dump_lookup_table(lookup_table, save_fp)
   
   ''' Save '''
   save_dp = (LOG_PATH / args.name) if args.name else LOG_PATH
@@ -73,13 +98,20 @@ def train(args):
     D = ave_D(Jc_dict, Nq)
     k = min(order(Jc_dict), 6)
 
+    if args.ex:
+      vals_std = np.asarray(list(Jc_dict.values())).std()
+      w = SIM_EQ if vals_std < THRESHOLD else NON_EQ
+
     # vqc
     gamma_params = [f'g{i}' for i in range(p)]
     beta_params  = [f'b{i}' for i in range(p)]
     circ = qaoa_hubo(Jc_dict, Nq, gamma_params, beta_params, p=p)
 
     # init_p
-    params = lookup_table[p][k]
+    if args.ex:
+      params = lookup_table_ex[w][p][k]
+    else:
+      params = lookup_table[p][k]
     gammas, betas = np.split(params, 2)
     factor = rescale_factor(Jc_dict) * args.rescaler    # rescale gamma
     gammas = trans_gamma(gammas, D) * factor
@@ -132,20 +164,36 @@ def train(args):
     dx_decay = args.dx_decay ** (init_iter // args.dx_decay_every)
     ΔE = E_before - E_after
     lr = args.dx * dx_decay * np.log1p(ΔE)
-    if args.momentum:
-      if p not in lookup_table_moment: lookup_table_moment[p] = {}
-      if k not in lookup_table_moment[p]: lookup_table_moment[p][k] = tuned_params.copy()
-      lookup_table_moment[p][k] = (1 - args.momentum) * lookup_table_moment[p][k] + args.momentum * tuned_params
-      lookup_table[p][k] = (1 - lr) * params + lr * lookup_table_moment[p][k]
+    if args.ex:
+      if args.momentum:
+        if w not in lookup_table_ex_moment: lookup_table_ex_moment[w] = {}
+        if p not in lookup_table_ex_moment[w]: lookup_table_ex_moment[w][p] = {}
+        if k not in lookup_table_ex_moment[w][p]: lookup_table_ex_moment[w][p][k] = tuned_params.copy()
+        lookup_table_ex_moment[w][p][k] = (1 - args.momentum) * lookup_table_ex_moment[w][p][k] + args.momentum * tuned_params
+        lookup_table_ex[w][p][k] = (1 - lr) * params + lr * lookup_table_ex_moment[w][p][k]
+      else:
+        lookup_table_ex[w][p][k] = (1 - lr) * params + lr * tuned_params
     else:
-      lookup_table[p][k] = (1 - lr) * params + lr * tuned_params
+      if args.momentum:
+        if p not in lookup_table_moment: lookup_table_moment[p] = {}
+        if k not in lookup_table_moment[p]: lookup_table_moment[p][k] = tuned_params.copy()
+        lookup_table_moment[p][k] = (1 - args.momentum) * lookup_table_moment[p][k] + args.momentum * tuned_params
+        lookup_table[p][k] = (1 - lr) * params + lr * lookup_table_moment[p][k]
+      else:
+        lookup_table[p][k] = (1 - lr) * params + lr * tuned_params
 
     # tmp ckpt
     if (iter + 1) % 100 == 0:
-      dump_lookup_table(lookup_table, save_dp / f'lookup_table-iter={iter+1}.json')
+      if args.ex:
+        dump_lookup_table_ex(lookup_table_ex, save_dp / f'lookup_table-iter={iter+1}.json')
+      else:
+        dump_lookup_table(lookup_table, save_dp / f'lookup_table-iter={iter+1}.json')
 
   ''' Ckpt '''
-  dump_lookup_table(lookup_table, save_dp / 'lookup_table.json')
+  if args.ex:
+    dump_lookup_table_ex(lookup_table_ex, save_dp / 'lookup_table.json')
+  else:
+    dump_lookup_table(lookup_table, save_dp / 'lookup_table.json')
 
 
 if __name__ == '__main__':
@@ -158,7 +206,9 @@ if __name__ == '__main__':
   parser.add_argument('--dx_decay_every', default=100, type=int)
   parser.add_argument('--momentum', default=0.0, type=float, help='impact of of the new param, >= 0.6 recommended')
   parser.add_argument('--rescaler', default=1.275, type=float, help='gamma rescaler')
-  parser.add_argument('--load')
+  parser.add_argument('--load', help='load from lookup table of same type')
+  parser.add_argument('--load_base', help='load from lookup table of standard')
+  parser.add_argument('--ex', action='store_true', help='enable ex mode, divide and conquer simeq & noneq cases')
   parser.add_argument('--name')
   args = parser.parse_args()
 
