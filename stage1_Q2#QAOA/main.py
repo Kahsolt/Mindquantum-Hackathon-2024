@@ -7,8 +7,9 @@ from scipy.interpolate import interp1d
 from utils.path import LOG_PATH
 from utils.lookup_table import load_lookup_table
 
-#lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay' / 'lookup_table-iter=9400.json')
-lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay-moment-fast' / 'lookup_table-iter=3800.json')
+lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay' / 'lookup_table-iter=9400.json')
+#lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay-moment-fast_ft' / 'lookup_table-iter=9800.json')
+#lookup_table = load_lookup_table(LOG_PATH / 'ft-ada-decay-moment-fast' / 'lookup_table-iter=3800.json')
 
 
 def ave_D(Jc, nq):      # average degree
@@ -91,7 +92,7 @@ def main(Jc_dict:Dict[Tuple[int], float], p:int, Nq:int=12, rescaler:float=1.275
         params = interp_expand(p, k)
     gammas, betas = np.split(params, 2)
     gammas = trans_gamma(gammas, D)
-    factor = rescale_factor(Jc_dict) * rescaler
+    factor = rescale_factor(Jc_dict) * rescaler     # 1.165
     return gammas * factor, betas
 
 

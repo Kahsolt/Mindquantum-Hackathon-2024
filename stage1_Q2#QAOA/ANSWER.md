@@ -72,7 +72,18 @@
 |                     | 20792.42218 |            | ft-ada-decay; iter=8000, rescaler=1.275 |
 |                     | 20824.90335 |            | ft-ada-decay; iter=9000, rescaler=1.275 |
 |                     | 20855.28777 |            | ft-ada-decay; iter=9300, rescaler=1.275 |
-| 2024-06-11 11:10:03 | 20948.34952 | 30332.7544 | ft-ada-decay; iter=9400, rescaler=1.275 |
+|                     | 20859.12707 |            | ft-ada-decay; iter=9400, rescaler=1.1 |
+|                     | 20996.19230 |            | ft-ada-decay; iter=9400, rescaler=1.14 |
+|                     | 21014.58179 |            | ft-ada-decay; iter=9400, rescaler=1.15 |
+|                     | 21023.73164 |            | ft-ada-decay; iter=9400, rescaler=1.16 |
+| 2024-06-22 17:27:59 | 21024.64967 |            | ft-ada-decay; iter=9400, rescaler=1.165 |
+|                     | 21023.28070 |            | ft-ada-decay; iter=9400, rescaler=1.17 |
+|                     | 21016.05226 |            | ft-ada-decay; iter=9400, rescaler=1.18 |
+|                     | 21014.30511 |            | ft-ada-decay; iter=9400, rescaler=1.2 |
+|                     | 20984.50076 |            | ft-ada-decay; iter=9400, rescaler=1.26 |
+|                     | 20962.71068 |            | ft-ada-decay; iter=9400, rescaler=1.27 |
+| 2024-06-11 11:10:03 | 20948.34952 | **30332.7544** | ft-ada-decay; iter=9400, rescaler=1.275 |
+|                     | 20928.00170 |            | ft-ada-decay; iter=9400, rescaler=1.28 |
 |                     | 20907.75227 |            | ft-ada-decay; iter=9500, rescaler=1.275 |
 |                     | 20863.27086 |            | ft-ada-decay; iter=9600, rescaler=1.275 |
 |                     | 20809.78942 |            | ft-ada-decay; iter=9700, rescaler=1.275 |
@@ -82,13 +93,21 @@
 |                     | 19926.67130 |            | ft-ada-decay-moment-fast; iter=2000, rescaler=1.275 |
 |                     | 19905.01599 |            | ft-ada-decay-moment-fast; iter=3000, rescaler=1.275 |
 |                     | 19995.16122 |            | ft-ada-decay-moment-fast; iter=3700, rescaler=1.275 |
-|                     | 20381.14635 |            | ft-ada-decay-moment-fast; iter=3800, rescaler=1.275 |
+| 2024-06-22 16:06:33 | 20381.14635 | 29800.8173 | ft-ada-decay-moment-fast; iter=3800, rescaler=1.275 |
 |                     | 20145.42843 |            | ft-ada-decay-moment-fast; iter=3900, rescaler=1.275 |
 |                     | 20159.19957 |            | ft-ada-decay-moment-fast; iter=4000, rescaler=1.275 |
 |                     | 20377.47218 |            | ft-ada-decay-moment-fast; iter=4500, rescaler=1.275 |
 |                     | 20326.20533 |            | ft-ada-decay-moment-fast; iter=4600, rescaler=1.275 |
-|                     |             |            | ft-ada-decay-moment-fast; iter=4700, rescaler=1.275 |
+|                     | 20100.26353 |            | ft-ada-decay-moment-fast; iter=4700, rescaler=1.275 |
 |                     | 19755.98407 |            | ft-ada-decay-moment-fast; iter=4900, rescaler=1.275 |
+|                     | 20916.35393 |            | ft-ada-decay-moment-fast_ft; iter=9500, rescaler=1.275 |
+|                     | 20878.52841 |            | ft-ada-decay-moment-fast_ft; iter=9600, rescaler=1.275 |
+|                     | 21031.99966 |            | ft-ada-decay-moment-fast_ft; iter=9700, rescaler=1.165 |
+|                     | 20950.16834 |            | ft-ada-decay-moment-fast_ft; iter=9700, rescaler=1.275 |
+| 2024-06-22 17:53:30 | **21033.52542** |            | ft-ada-decay-moment-fast_ft; iter=9800, rescaler=1.165 |
+|                     | 20931.95560 |            | ft-ada-decay-moment-fast_ft; iter=9800, rescaler=1.275 |
+|                     | 20907.45221 |            | ft-ada-decay-moment-fast_ft; iter=9900, rescaler=1.275 |
+|                     | 20906.39396 |            | ft-ada-decay-moment-fast_ft; iter=10000, rescaler=1.275 |
 
 ### reference
 
