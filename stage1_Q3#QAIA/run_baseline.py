@@ -60,14 +60,16 @@ def get_detector(args, nbps:int, Nt:int):
     return detector_cache[cfg]
 
 
-def modulate_and_transmit(bits:ndarray, H:ndarray, nbps:int, SNR:int) -> Tuple[ndarray, ndarray]:
+def modulate_and_transmit(bits:ndarray, H:ndarray, nbps:int, SNR:int=None) -> Tuple[ndarray, ndarray]:
     mapper = get_mapper(nbps)
     b = tf.convert_to_tensor(bits, dtype=tf.int32)
     x: ndarray = mapper(b).cpu().numpy()
 
-    # SNR(dB) := 10*log10(P_signal/P_noise) ?= Var(signal) / Var(noise)
-    sigma = np.var(bits) / SNR
-    noise = np.random.normal(scale=sigma**0.5, size=x.shape)
+    noise = 0
+    if SNR:
+        # SNR(dB) := 10*log10(P_signal/P_noise) ?= Var(signal) / Var(noise)
+        sigma = np.var(bits) / SNR
+        noise = np.random.normal(scale=sigma**0.5, size=x.shape)
     y = H @ x + noise
     return x, y
 

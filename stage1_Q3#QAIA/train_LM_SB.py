@@ -218,10 +218,11 @@ def to_ising_ext(H:Tensor, y:Tensor, nbps:int, lmbd:Tensor, lmbd_res:Tensor=None
   return J, h
 
 
-def ber_loss(spins:Tensor, bits:Tensor) -> Tensor:
+def ber_loss(spins:Tensor, bits:Tensor, loss_fn:str='mse') -> Tensor:
   ''' differentiable version of compute_ber() '''
-  from judger import compute_ber
-  assert compute_ber
+  if False:
+    from judger import compute_ber
+    assert compute_ber
 
   # convert the bits from sionna style to constellation style
   # Sionna QAM16 map: https://nvlabs.github.io/sionna/examples/Hello_World.html
@@ -245,13 +246,19 @@ def ber_loss(spins:Tensor, bits:Tensor) -> Tensor:
     x_dual = 2 - x
     bits_final[:, i] = torch.where(x <= x_dual, x, x_dual)
   # calc BER
-  return F.mse_loss(bits_final, bits_constellation)
+  if loss_fn in ['l2', 'mse']:
+    return F.mse_loss(bits_final, bits_constellation)
+  elif loss_fn in ['l1', 'mae']:
+    return F.l1_loss(bits_final, bits_constellation)
+  elif loss_fn == 'bce':
+    pseudo_logits = bits_final * 2 - 1
+    return F.binary_cross_entropy_with_logits(pseudo_logits, bits_constellation)
 
 
 def make_random_transmit(bits_shape:torch.Size, H:Tensor, nbps:int, SNR:int) -> Tuple[Tensor, Tensor]:
   ''' transmit random bits through given channel mix H '''
   bits = np.random.uniform(size=bits_shape) < 0.5
-  x, y = modulate_and_transmit(bits.astype(np.float32), H.cpu().numpy(), nbps, SNR)
+  x, y = modulate_and_transmit(bits.astype(np.float32), H.cpu().numpy(), nbps, SNR=10)   # SNR
   bits = torch.from_numpy(bits).to(device, torch.float32)
   y    = torch.from_numpy(y)   .to(device, torch.complex64)
   return bits, y
@@ -343,7 +350,8 @@ def train(args):
         spins = model(H, y, nbps, snr=SNR)
       else:
         spins = model(H, y, nbps)
-      loss = torch.stack([ber_loss(sp, bits) for sp in spins]).mean()
+      loss_each = torch.stack([ber_loss(sp, bits, args.loss_fn) for sp in spins])
+      loss = getattr(loss_each, args.agg_fn)()
       loss_for_backward: Tensor = loss / args.grad_acc
       loss_for_backward.backward()
 
@@ -412,6 +420,8 @@ if __name__ == '__main__':
   parser.add_argument('-T', '--n_iter', default=10, type=int)
   parser.add_argument('-B', '--batch_size', default=32, type=int, help='SB candidate batch size')
   parser.add_argument('--steps', default=3000, type=int)
+  parser.add_argument('--loss_fn', default='mse', choices=['mse', 'l1', 'bce'])
+  parser.add_argument('--agg_fn', default='mean', choices=['mean', 'max'])
   parser.add_argument('--grad_acc', default=1, type=int, help='training batch size')
   parser.add_argument('--lr', default=1e-2, type=float)
   parser.add_argument('--load', help='ckpt to resume')

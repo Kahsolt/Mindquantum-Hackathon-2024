@@ -2,6 +2,9 @@
 python train_LM_SB.py -M DU_LM_SB --lr 0.01
 python train_LM_SB.py -M DU_LM_SB --lr 0.0001 --steps 100000
 
+python train_LM_SB.py -M DU_LM_SB -T 8 --lr 0.0001 --steps 50000 --loss_fn bce --agg_fn max
+
+
 :pReg_LM_SB
 python train_LM_SB.py -M pReg_LM_SB --lr 0.01
 python train_LM_SB.py -M pReg_LM_SB --lr 0.0001 --steps 100000

@@ -9,6 +9,9 @@ from numpy import ndarray
 from qaia import QAIA, NMFA, SimCIM, CAC, CFC, SFC, ASB, BSB, DSB, LQA
 from qaia import DUSB
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 BASE_PATH = Path(__file__).parent
 LOG_PATH = BASE_PATH / 'log'
 DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=10_lr=0.0001.json'
@@ -16,7 +19,7 @@ pReg_LM_SB_weights = LOG_PATH / 'pReg-LM-SB_T=10_lr=0.0001.pkl'
 ppReg_LM_SB_weights = LOG_PATH / 'ppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 pppReg_LM_SB_weights = LOG_PATH / 'pppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 
-run_cfg = 'pReg_LM_SB'
+run_cfg = 'DU_LM_SB'
 
 if run_cfg == 'DU_LM_SB':
     with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
@@ -134,8 +137,10 @@ def to_ising(H:ndarray, y:ndarray, nbps:int) -> J_h:
 
     # Eq. 8, J is symmetric with diag=0, J[i,j] signifies spin interaction of σi and σj in the Ising model
     # This is different from the original paper because we use normalized transmitted symbol
-    J = -T.T @ H_tilde.T @ H_tilde @ T * (2 / qam_var)
+    # J = -ZeroDiag(T.T * H.T * H * T))
+    J = T.T @ H_tilde.T @ H_tilde @ T * (-2 / qam_var)
     J[np.diag_indices_from(J)] = 0
+    # h = 2 * H * T.T * H.T * (y - H * T * 1 + (sqrt(M) - 1) * H * 1)
     z = y_tilde / np.sqrt(qam_var) - H_tilde @ T @ np.ones((N * rb, 1)) / qam_var + (np.sqrt(M) - 1) * H_tilde @ np.ones((N, 1)) / qam_var
     h = 2 * z.T @ H_tilde @ T
 
@@ -166,23 +171,26 @@ def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray
     y_tilde = np.concatenate([y.real, y.imag])
 
     # Eq. 10
-    if lmbd_res is None:
+    if lmbd_res is None:                # DU
         # LM-SB from arXiv:2306.16264, the LMMSE-like part with our divisor fix :)
         U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd
     else:
-        if lmbd_res_mode == 'res':
+        if lmbd_res_mode == 'res':      # pReg
             # learnable identity-residual LMMSE-like part
             # NOTE: here `lmbd_res` should be the precomputed symmetric, this is not the same as in training!!
             U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd_res) / lmbd
-        elif lmbd_res_mode == 'proj':
+        elif lmbd_res_mode == 'proj':   # ppReg
             # fully learnable projection space
             U_λ = lmbd_res
+    # J = -ZeroDiag(T.T * H.T * H * T))
     H_tilde_T = H_tilde @ T
-    U_λ_norm = U_λ * (2 / qam_var)
-    J = -H_tilde_T.T @ U_λ_norm @ H_tilde_T 
+    H_tilde_T_T = H_tilde_T.T
+    J = H_tilde_T_T @ (U_λ * (-2 / qam_var)) @ H_tilde_T 
     for j in range(J.shape[0]): J[j, j] = 0
-    z = (y_tilde - H_tilde @ (T @ get_ones(N * rb)) + (np.sqrt(M) - 1) * H_tilde @ get_ones(N)) / np.sqrt(qam_var)
-    h = H_tilde_T.T @ (U_λ @ (2 * z))
+    # h = 2 * H * T.T * H.T * (y - H * T * 1 + (sqrt(M) - 1) * H * 1)
+    # NOTE: y_tilde should devide by `qam_var`, but `sqrt(qam_var)` gives the same outputs (wtf?)
+    z = y_tilde - H_tilde @ T.sum(axis=-1, keepdims=True) + (np.sqrt(M) - 1) * H_tilde.sum(axis=-1, keepdims=True) 
+    h = H_tilde_T_T @ (U_λ @ (2 / np.sqrt(qam_var) * z))
 
     # [rb*N, rb*N], [rb*N, 1]
     return J, h
@@ -194,28 +202,26 @@ def to_ising_MDI_MIMO(H:ndarray, y:ndarray, nbps:int) -> J_h:
 def solver_qaia_lib(qaia_cls, J:ndarray, h:ndarray) -> ndarray:
     bs = 1
     solver: QAIA = qaia_cls(J, h, batch_size=bs, n_iter=10)
-    solver.update()
-    sample = np.sign(solver.x)      # [rb*N, B]
+    solver.update()                     # [rb*N, B]
     if bs > 1:
         energy = solver.calc_energy()   # [1, B]
         opt_index = np.argmin(energy)
     else:
         opt_index = 0
-    solution = sample[:, opt_index] # [rb*N], vset {-1, 1}
+    solution = np.sign(solver.x[:, opt_index])  # [rb*N], vset {-1, 1}
     return solution
 
 def solver_DU_LM_SB(J:ndarray, h:ndarray) -> ndarray:
     global deltas, eta
     bs = 1
     solver = DUSB(J, h, deltas, eta, batch_size=bs)
-    solver.update()
-    sample = np.sign(solver.x)      # [rb*N, B]
+    solver.update()                     # [rb*N, B]
     if bs > 1:
         energy = solver.calc_energy()   # [1, B]
         opt_index = np.argmin(energy)
     else:
         opt_index = 0
-    solution = sample[:, opt_index] # [rb*N], vset {-1, 1}
+    solution = np.sign(solver.x[:, opt_index])  # [rb*N], vset {-1, 1}
     return solution
 
 

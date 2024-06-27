@@ -119,7 +119,7 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | LM_SB | 0.35360 |   5.34 | 28.3109 |         | B=1, n_iter=1 |
 | DU_LM_SB | 0.28677 | 5.59 | 29.8412 |  | B=1, n_iter=10, lr=0.01 |
 | DU_LM_SB | 0.20071 | 3.36 | 55.6981 |  | B=1, n_iter=10, lr=0.0001 (after profiling) |
-| **DU_LM_SB** | 0.19932 |      |         |  89.3023  | B=1, n_iter=10, lr=0.0001, optim_steps=100000 (after profiling) |
+| **DU_LM_SB** | 0.19932 | 2.73 | 68.5260 | 89.3023/? | B=1, n_iter=10, lr=0.0001, optim_steps=100000 (after profiling) |
 | DU_LM_SB | 0.20111 | 5.73 | 32.6491 |  | B=1, n_iter=10, lr=0.01, overfit |
 | DU_LM_SB | 0.21522 | 8.50 | 21.6114 |  | B=1, n_iter=10, lr=0.01, overfit, update_hard |
 | DU_LM_SB | 0.21898 | 6.85 | 26.6877 |  | B=1, n_iter=10, lr=0.01, overfit, use essay c_0 |
@@ -130,7 +130,7 @@ the DU trick does not improve any, stuck here and then the scoring formula chang
 | DU_LM_SB | 0.20049 | 2.89 | 64.8713 | 73.7797 | B=2, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20022 | 2.99 | 62.5865 |  | B=3, n_iter=10, lr=0.01, overfit (after profiling) |
 | DU_LM_SB | 0.20046 | 3.07 | 61.0498 |  | B=4, n_iter=10, lr=0.01, overfit (after profiling) |
-| **pReg_LM_SB** | 0.19952 | | | 92.9875 | B=1, n_iter=10, lr=0.0001, optim_steps=100000; highest score (DU-method, non-cheaty) |
+| **pReg_LM_SB** | 0.19940 | 2.77 | 67.6817 | 92.9875 | B=1, n_iter=10, lr=0.0001, optim_steps=100000; highest score (DU-method, non-cheaty) |
 | pReg_LM_SB | 0.20015 | | | | B=1, n_iter=10, lr=0.0001, optim_steps=50000, refined from `DU-LM-SB_T=10_lr=0.0001.pth` |
 | pReg_LM_SB | 0.21701 | 2.95 | 62.0686 | 89.8824 | B=1, n_iter=10, lr=0.01 |
 | pReg_LM_SB | 0.15602 | 3.60 | 54.9289 | 95.1233 | B=1, n_iter=10, lr=0.01, overfit |
