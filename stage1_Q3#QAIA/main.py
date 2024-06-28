@@ -9,19 +9,17 @@ from numpy import ndarray
 from qaia import QAIA, NMFA, SimCIM, CAC, CFC, SFC, ASB, BSB, DSB, LQA
 from qaia import DUSB
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 BASE_PATH = Path(__file__).parent
 LOG_PATH = BASE_PATH / 'log'
 DU_LM_SB_weights = LOG_PATH / 'DU-LM-SB_T=10_lr=0.0001.json'
-pReg_LM_SB_weights = LOG_PATH / 'pReg-LM-SB_T=10_lr=0.0001.pkl'
+pReg_LM_SB_weights = LOG_PATH / 'pReg-LM-SB_T=6_lr=0.0001.pkl'
 ppReg_LM_SB_weights = LOG_PATH / 'ppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 pppReg_LM_SB_weights = LOG_PATH / 'pppReg-LM-SB_T=10_lr=0.01_overfit.pkl'
 
-run_cfg = 'DU_LM_SB'
+#run_cfg = 'DU_LM_SB'
+run_cfg = 'DU_LM_SB-approx'
 
-if run_cfg == 'DU_LM_SB':
+if run_cfg.startswith('DU_LM_SB'):
     with open(DU_LM_SB_weights, 'r', encoding='utf-8') as fh:
         params = json.load(fh)
         deltas: List[float] = params['deltas']
@@ -79,6 +77,18 @@ def get_T(N:int, rb:int) -> ndarray:
         T = T.reshape(-1, N).T
         T_cache[key] = T
     return T_cache[key]
+
+
+def np_linagl_inv_hijack(a):
+    a, wrap = _makearray(a)
+    _assert_stacked_2d(a)
+    _assert_stacked_square(a)
+    t, result_t = _commonType(a)
+
+    signature = 'D->D' if isComplexType(t) else 'd->d'
+    extobj = get_linalg_error_extobj(_raise_linalgerror_singular)
+    ainv = _umath_linalg.inv(a, signature=signature, extobj=extobj)
+    return wrap(ainv.astype(result_t, copy=False))
 
 
 def to_ising(H:ndarray, y:ndarray, nbps:int) -> J_h:
@@ -147,7 +157,7 @@ def to_ising(H:ndarray, y:ndarray, nbps:int) -> J_h:
     # [rb*N, rb*N], [rb*N, 1]
     return J, h.T
 
-def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray=None, lmbd_res_mode:str='res') -> J_h:
+def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray=None, lmbd_mode:str='inv', lmbd_res_mode:str='res') -> J_h:
     # the size of constellation, the M-QAM where M in {16, 64, 256}
     M = 2**nbps
     # n_elem at TX side (c=2 for real/imag, 1 symbol = 2 elem)
@@ -173,8 +183,28 @@ def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray
     # Eq. 10
     if lmbd_res is None:                # DU
         # LM-SB from arXiv:2306.16264, the LMMSE-like part with our divisor fix :)
-        U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I) / lmbd
-    else:
+        if lmbd_mode == 'inv':
+            U_λ = np.linalg.inv(H_tilde @ H_tilde.T + lmbd * I)
+        elif lmbd_mode == 'approx':
+            # https://en.wikipedia.org/wiki/Neumann_series
+            #   T^-1 = Σk (I - T)^k
+            # hence we have
+            #   inv(λI + A) = inv(λ(I + A/λ))
+            #               ~ inv(I + A/λ) / λ
+            #               ~ inv(I + A|A|)    # λ make no difference experimentally, wtf?
+            #               ~ Σk (A/|A|)^k
+            A = H_tilde @ H_tilde.T #/ lmbd
+            A /= np.linalg.norm(A)
+            if not 'the theoretical way':
+                it = I - A
+                U_λ = it
+                for _ in range(24):
+                    U_λ = it @ (I + U_λ)    # 华罗庚公式
+            else:                           # wtf, it just works?!
+                U_λ = I - A
+                for _ in range(5):          # NOTE: cherry-picked magic number!!
+                    U_λ = np.matmul(U_λ, I + U_λ, out=U_λ)  # inplace!
+    else:       # method on this branch is not that good :(
         if lmbd_res_mode == 'res':      # pReg
             # learnable identity-residual LMMSE-like part
             # NOTE: here `lmbd_res` should be the precomputed symmetric, this is not the same as in training!!
@@ -182,15 +212,15 @@ def to_ising_ext(H:ndarray, y:ndarray, nbps:int, lmbd:float=25, lmbd_res:ndarray
         elif lmbd_res_mode == 'proj':   # ppReg
             # fully learnable projection space
             U_λ = lmbd_res
+
     # J = -ZeroDiag(T.T * H.T * H * T))
     H_tilde_T = H_tilde @ T
-    H_tilde_T_T = H_tilde_T.T
-    J = H_tilde_T_T @ (U_λ * (-2 / qam_var)) @ H_tilde_T 
+    J = H_tilde_T.T @ (U_λ * (-2 / qam_var)) @ H_tilde_T
     for j in range(J.shape[0]): J[j, j] = 0
     # h = 2 * H * T.T * H.T * (y - H * T * 1 + (sqrt(M) - 1) * H * 1)
     # NOTE: y_tilde should devide by `qam_var`, but `sqrt(qam_var)` gives the same outputs (wtf?)
-    z = y_tilde - H_tilde @ T.sum(axis=-1, keepdims=True) + (np.sqrt(M) - 1) * H_tilde.sum(axis=-1, keepdims=True) 
-    h = H_tilde_T_T @ (U_λ @ (2 / np.sqrt(qam_var) * z))
+    z = y_tilde - H_tilde @ T.sum(axis=-1, keepdims=True) + (np.sqrt(M) - 1) * H_tilde.sum(axis=-1, keepdims=True)
+    h = H_tilde_T.T @ (U_λ @ (2 / np.sqrt(qam_var) * z))
 
     # [rb*N, rb*N], [rb*N, 1]
     return J, h
@@ -233,6 +263,8 @@ def ising_generator(H:ndarray, y:ndarray, nbps:int, snr:float) -> J_h:
         return to_ising_ext(H, y, nbps, lmbd=25)
     elif run_cfg == 'DU_LM_SB':
         return to_ising_ext(H, y, nbps, lmbd=lmbd)
+    elif run_cfg == 'DU_LM_SB-approx':
+        return to_ising_ext(H, y, nbps, lmbd=lmbd, lmbd_mode='approx')
     elif run_cfg == 'pReg_LM_SB':
         return to_ising_ext(H, y, nbps, lmbd=lmbd, lmbd_res=lmbd_res[H.shape[0]])
     elif run_cfg == 'ppReg_LM_SB':
@@ -246,5 +278,5 @@ def qaia_mld_solver(J:ndarray, h:ndarray) -> ndarray:
         return solver_qaia_lib(BSB, J, h)
     elif run_cfg == 'LM_SB':
         return solver_qaia_lib(BSB, J, h)
-    elif run_cfg in ['DU_LM_SB', 'pReg_LM_SB', 'ppReg_LM_SB', 'pppReg_LM_SB']:
+    elif run_cfg in ['DU_LM_SB', 'DU_LM_SB-approx', 'pReg_LM_SB', 'ppReg_LM_SB', 'pppReg_LM_SB']:
         return solver_DU_LM_SB(J, h)
