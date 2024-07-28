@@ -1,0 +1,14 @@
+# font
+1#QSim/*.[ot]tf
+2#QAOA/*.[ot]tf
+3#QAIA/*.[ot]tf
+
+# tex tmpl
+gbt7714-numerical.bst
+cumcmthesis.cls
+
+# tex compile
+*.aux
+*.out
+*.log
+*.gz
