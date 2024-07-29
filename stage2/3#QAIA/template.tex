@@ -24,12 +24,12 @@
 
 \maketitle
 \begin{abstract}
-量子退火启发算法 (QAIA) 近年来被用于求解通信领域中的多收发系统 (MIMO) 信号检测问题，本赛题要求选手设计一个基于 QAIA 原理的 MIMO 检测算法。
+近年来，量子退火启发算法 (QAIA) 被用于求解通信领域中的多收发系统 (MIMO) 信号检测问题，本赛题要求选手作相关探索并设计一个基于 QAIA 原理的 MIMO 检测算法。
 本文在复现文献 \cite{Takabe2023} 所提出的 DU-LM-SB 方法基础上继续加以改进，提出并探索了 pReg-LM-SB 系列方法以试图进一步降低比特误差率或提高解码速度。
 若仅考虑比特误差，我们提交的最好方案比特误码率可低至 0.18597，相比基线降低 54.77\%；
 若兼顾运行时间，则我们改进出的方案在线评测分数可达 105.2462 分。
 
-\keywords{量子退火启发算法 \quad QAIA \quad 模拟分叉 \quad 深度展开 \quad MIMO检测}
+\keywords{量子退火启发算法 \quad 模拟分叉 \quad 深度展开 \quad MIMO检测}
 \end{abstract}
 
 
@@ -72,8 +72,8 @@ MIMO检测问题即在给定接受信号 $ \mathrm{y} $ 和信道矩阵 $ \mathr
 \end{equation}
 
 Singh 等人 \cite{Singh2021} 将 MIMO 问题映射为组合优化问题，从首次实现了将 SimCIM 算法应用于 MIMO 检测问题求解。
-同年 Goto 提出的模拟分叉算法 (SB, Simulated Bifurcation) \cite{Goto2021} 受启发于复杂系统中的分叉现象，可用于在经典计算机上高效地解决组合优化问题。
-基于此，Takabe \cite{Takabe2023} 用 SB 替代 SimCIM 进行 MIMO 检测，获得了更好的结果，具体做法流程如下：
+而 Goto 提出的模拟分叉算法 (SB, Simulated Bifurcation) \cite{Goto2021} 受启发于复杂系统中的分叉现象，可用于在经典计算机上高效地解决组合优化问题。
+基于上述研究工作，Takabe \cite{Takabe2023} 用 SB 替代 SimCIM 进行 MIMO 检测，获得了更好的结果，具体做法流程如下：
 首先按公式 \ref{eq:to-ising-0} 将复信道矩阵 $ \mathrm{H} $ 平坦化为实矩阵，进一步按公式 \ref{eq:to-ising-1} 构造出 Ising 模型中的耦合系数矩阵 $ \mathrm{J} $ 与外场向量 $ \mathrm{h} $，
 随后运行 SB 算法使用辛几何欧拉方法 (symplectic Euler method) 迭代求解关于系统哈密顿量 $ H_{SB} $ 的偏微分方程组 \ref{eq:sb} 得到自旋向量 $ x $，
 最后从自旋形式 $ \{-1,1\} $ 转换为比特形式 $ \{0,1\} $ 得到恢复后的数据比特。
@@ -120,7 +120,7 @@ h &= 2 * z^T \tilde{\mathrm H} \mathrm T \\
 
 文献 \cite{Takabe2023} 中引述了三种方法，其关系为递进式的改进：
 首先是基线方法 ML-SB，即使用上一节中提到的信道矩阵转Ising模型公式 \ref{eq:to-ising-1} 搭配原始的 SB 算法；
-然后是引入正则项的改进方法 LM-SB，即按照公式 \ref{eq:to-ising-du} 向 $ \mathrm{J} $ 和 $ \mathrm{h} $ 中引入了一个 LMMSE-like 的矩阵作为正则项，以尽量避免 SB 算法陷入局部最优解，降低了误差底线；
+然后是引入正则项的改进方法 LM-SB，即按照公式 \ref{eq:to-ising-du} 向 $ \mathrm{J} $ 和 $ \mathrm{h} $ 中引入了一个 LMMSE-like 的矩阵 $ \mathrm U_\lambda $ 作为正则项，以尽量避免 SB 算法陷入局部最优解，降低了误差底线；
 最后是引入深度展开技术 (DU, deep unfold) 的改进方法 DU-LM-SB，通过梯度下降反向传播来实现 SB 算法中一些超参数的自动调参，并极大降低算法所需要的迭代步数，基本思想类似于 QAOA 算法用有限离散步来模拟连续的退火过程。
 
 \begin{equation}
@@ -134,7 +134,7 @@ h &= 2 * z^T \mathrm U_\lambda \tilde{\mathrm H} \mathrm T \\
 
 在实现 LM-SB 方法时，其中的 $ \lambda $ 是一个需要手动调节的超参数，原论文设置为 1。
 但我们发现在比赛给定的数据集上，无论怎么调节这个常数，算法性能都不好。
-于是我们进一步将 $ \mathrm U_\lambda $ 的定义改造为公式 \label{eq:U-lmbd}，并发现此时取 $ \lambda = 25 $ 是一个不错的选择。
+于是我们进一步将 $ \mathrm U_\lambda $ 的定义改造为公式 \ref{eq:U-lmbd}，并发现此时取 $ \lambda = 25 $ 是一个不错的选择。
 在实现 DU-LM-SB 方法时，有一个难点是将 SB 算法和 ber 损失函数改造成可微函数，以实现端到端梯度传递，
 具体实现比较繁琐而富有技巧，可参考附录和我们提交的代码。
 
@@ -180,14 +180,14 @@ h &= 2 * z^T \mathrm U_\lambda \tilde{\mathrm H} \mathrm T \\
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{结果}
 
-我们首先给出 Sionna库 \cite{sionna2022} 所提供的各传统方法在比赛给定数据集上的性能表现，此处仅考虑比特错误率 (BER, bit errir rate) 指标。
-如表 \ref{tbl:result-c} 所示，其中 linear-zf-maxlog 即比赛所指定的基线方法 Zero-Forcing，而 ep-iter=10 即 10 步迭代的 Expectation Propagation 方法 \cite{Wang2020} 有最低的比特错误率 0.16872。
-其中被删除线划去的 mmse-iter=8 虽然看似有更低的比特错误率 0.15738，实则加入了真实目标值作为正则项来进行优化，故这个最低数字标定了比赛所提供的数据集在一般方法上所能达到的最低理论误差下限。
+首先给出 Sionna库 \cite{sionna2022} 所提供的各传统方法在比赛给定数据集上的性能表现，此处仅考虑比特错误率 (BER, bit errir rate) 指标。
+如表 \ref{tbl:result-c} 所示，其中 linear-zf-maxlog 即比赛所指定的基线方法 Zero-Forcing 有最高的 BER=0.41121，而 ep-iter=10 即 10 步迭代的 Expectation Propagation 方法 \cite{Wang2020} 有最低的 BER=0.16872。
+其中被删除线划去的 mmse-iter=8 虽然看似有更低的 BER=0.15738，实则加入了真实目标值作为正则项来进行优化，故这个最低数字标定了比赛所提供的数据集在一般方法上所能达到的最低理论误差下限。
 
-其次我们给出 Mindquantum 库 \cite{mindquantum2021} 所提供的各类基于QAIA的算法在比赛给定数据集上的性能表现。
+其次给出 Mindquantum 库 \cite{mindquantum2021} 所提供的各类基于QAIA的算法在比赛给定数据集上的性能表现。
 如表 \ref{tbl:result-q} 所示，可见 SB 系列算法最优情况 (BER=0.21584) 确实超越了此研究方向根论文所使用的 SimCIM (BER=0.23271)。
 进一步复现验证文献 \cite{Takabe2023} 可得到结果 LM-bSB-λ=25 (BER=0.18591) 和 DU-LM-SB-T=30 (BER=0.19497)，均优于朴素 SB。
-但 DU-LM-SB 相对于 LM-SB 而言，并未展现出论文中所报道的显著优势。
+但 DU-LM-SB 相对于 LM-SB 而言，\textbf{并未}展现出论文中所报道的显著优势。
 
 \begin{minipage}{\textwidth}
 \begin{minipage}[t]{0.45\textwidth}
@@ -200,7 +200,7 @@ h &= 2 * z^T \mathrm U_\lambda \tilde{\mathrm H} \mathrm T \\
 		linear-zf-maxlog		& \underline{0.41121} \\
 		linear-zf-app			& 0.40605 \\
 		linear-mf-maxlog		& 0.34104 \\
-		linear-mf-app		& 0.33401 \\
+		linear-mf-app			& 0.33401 \\
 		linear-lmmse-maxlog	& 0.20779 \\
 		linear-lmmse-app		& 0.20721 \\
 		kbest-k=64			& 0.26206 \\
@@ -213,31 +213,31 @@ h &= 2 * z^T \mathrm U_\lambda \tilde{\mathrm H} \mathrm T \\
 	\makeatletter\def\@captype{table}\makeatother
 	\caption{基于量子退火启发的对比算法\label{tbl:result-q}}
 	\begin{tabular}{cc}        
-		\textbf{算法} 						& \textbf{比特错误率↓} \\
+		\textbf{算法} 					& \textbf{比特错误率↓} \\
 		\hline
-		NMFA   							& 0.38561 \\
+		NMFA   						& 0.38561 \\
 		SimCIM \cite{Singh2021} 			& 0.23271 \\
-		CAC    							& 0.31591 \\
-		CFC    							& 0.23801 \\
-		SFC    							& 0.23796 \\
-		ASB    							& 0.34054 \\
-		DSB   							& 0.28741 \\
-		BSB \cite{Goto2021} 				& 0.21584 \\
-		LQA   							& 0.20627 \\
+		CAC    						& 0.31591 \\
+		CFC    						& 0.23801 \\
+		SFC    						& 0.23796 \\
+		ASB    						& 0.34054 \\
+		DSB   						& 0.28741 \\
+		BSB \cite{Goto2021} 			& 0.21584 \\
+		LQA   						& 0.20627 \\
 		LM-bSB-λ=25 \cite{Takabe2023} 	& 0.18591 \\
 		DU-LM-SB-T=30 \cite{Takabe2023}	& 0.19497 \\
 	\end{tabular}
 \end{minipage}
 \end{minipage}
 
-最后我们给出经过我们极致优化后的 LM-SB 和 DU-LM-SB 方法的配置，以及我们提出的 pReg-LM-SB 方法的实验结果。
+最后展示我们如何从 LM-SB 一步步极致优化到最后最优的 DU-LM-SB 方法的过程，以及略述我们提出的 pReg-LM-SB 方法的实验结果。
 如表 \ref{tbl:result} 所示，当 SB 算法的迭代次数 n\_iter=100，自旋向量的候选数量 B=10 时，LM-SB 方法能取得最低的误码率 BER=0.18656。
 进一步降低这两项参数会有效降低运行时间而提高分数，但也会导致误码率的急剧上升，直到 n\_iter=10，B=1 时，误码率已接近基线的一半 BER=0.21345。
 此时我们只能引入 DU 技术来保证误码率不降低太多的条件下，进一步降低迭代次数到 n\_iter=6。
 此时发现矩阵求逆称为主要的性能瓶颈，采用近似算法之后可将运行时间缩短至一半，虽然误码率有一定的提升，但总分加权而言还是有非常可观的提升，取得了我们的有效最高分 105.2462 分。
-对于另一方面针对 pReg-LM-SB 方法的探索，可见它与未经近似矩阵逆优化的 DU-LM-SB 相比性能完全持平；而完全不需要求矩阵逆的 ppReg-LM-SB 则更是同时在误码率和速度上都出类拔萃。
+另一方面，我们提出的 pReg-LM-SB 方法与未经近似矩阵逆优化的 DU-LM-SB 相比性能完全持平；而完全不需要求矩阵逆的 ppReg-LM-SB 则更是同时在误码率和速度上都出类拔萃。
 但需要注意的是，该方法是过拟合训练集的结果，它与上文 mmse-iter=8 一样，在一定程度上反映了任何方法在比赛给定数据集上可能达到的最高理论分数上限。
-图 \ref{fig:result-cmp} 给出了以朴素SB算法作为基线，与我们最好的方法配置作对比的各样本 BER 值 （分别按降序排列），可以看到基本轮廓保持了一致，但均值有明显的降低。
+图 \ref{fig:result-cmp} 给出了以朴素SB算法作为基线，与我们最好的方法配置作对比的各样本 BER 值 (分别按降序排列)，可以看到基本轮廓保持了一致，但均值有明显的降低。
 
 \begin{table}[h!]
 	\centering
@@ -272,7 +272,7 @@ h &= 2 * z^T \mathrm U_\lambda \tilde{\mathrm H} \mathrm T \\
 
 本文探索了基于 QAIA 算法求解 MIMO 检测问题，复现了 DU-LM-SB 系列的论文并加以调整改进，探索了自主提出的 pReg-LM-SB 方法。
 我们为程序运行效率做了精心的优化，并提出了基于截断诺伊曼级数来近似矩阵求逆。
-最终我们优化出来的方法最高可达到 105.2462 分，与估计出来的可能最优分数上限 137.3652 仍有约 23.38\% 的差距，仍待继续探索。
+最终我们优化出来的方法最高可达到 105.2462 分，与估计出来的可能最优分数上限 137.3652 仍有约 23.38\% 的差距待继续探索。
 只是无论面对任何方法，当我们对信道噪声难以估计的时候，MIMO检测问题都仍会是困难的；未来的进路可能由此铺开。
 
 
