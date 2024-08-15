@@ -149,8 +149,8 @@ h &= 2 * z^T \mathrm U_\lambda \tilde{\mathrm H} \mathrm T \\
 且在进一步的 DU-LM-SB 方法中，可学习参数只有一个参量 $ \lambda $，于是我们想到可以进一步提高这个正则项的可学习程度，从而引出了 pReg-LM-SB 系列方法，即在 DU-LM-SB 方法的基础上进一步探索：
 
 \begin{itemize}
-\item pReg-LM-SB：将 $  \lambda I $ 部分替换为一个可学习的对称矩阵
-\item ppReg-LM-SB：将整个 $ \mathrm U_\lambda $ 替换为一个可学习的对称矩阵
+\item pReg-LM-SB：将 $  \lambda I $ 部分替换为一个可学习的对称矩阵 $ \mathrm{A} \mathrm{A}^T $
+\item ppReg-LM-SB：将整个 $ \mathrm U_\lambda $ 替换为一个可学习的矩阵 $ \mathrm{A} $
 \end{itemize}
 
 \subsection{运行效率优化}

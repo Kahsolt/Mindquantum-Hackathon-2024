@@ -37,7 +37,7 @@ from simulator import HKSSimulator
 from utils import generate_molecule, get_molecular_hamiltonian
 
 SHOTS = 1000
-N_OPTIM_TRIAL = 10
+N_OPTIM_TRIAL = 1
 N_PRUNE = 2
 NOISE_AWARE_OPTIMIZE = False
 
@@ -328,6 +328,34 @@ def combine_hamiltonian(const:float, terms:SplitHam) -> QubitOperator:
     return ham
 
 def approx_merge_hamiltonian(split_ham:SplitHam) -> SplitHam:
+    # parse pauli string
+    terms: List[Tuple[float, str]] = []
+    for coeff, ops in split_ham:
+        string = R_str.findall(str(ops))[0]
+        terms.append((coeff, string))
+    # 若两个串X-Y对偶，则合并
+    def is_same(s1:str, s2:str) -> bool:
+        s = s1.replace('X', 'T').replace('Y', 'X').replace('T', 'Y')
+        return s == s2
+    string_coeff: Dict[str, List[float]] = {}
+    for coeff, string in terms:
+        found = False
+        if 'X' in string or 'Y' in string:
+            for string2 in string_coeff:
+                if not ('X' in string2 or 'Y' in string2):
+                    continue
+                if is_same(string2, string):
+                    string_coeff[string2].append(coeff)
+                    found = True
+                    break
+        if not found:
+            string_coeff[string] = [coeff]
+    terms_agg: Dict[str, float] = {k: np.sum(v) for k, v in string_coeff.items()}
+    # convert to SplitHam
+    split_ham_combined = [[v, QubitOperator(k)] for k, v in terms_agg.items()]
+    return split_ham_combined
+
+def approx_replace_hamiltonian(split_ham:SplitHam) -> SplitHam:
     # parse pauli string, each term has 0/2/4 count of Y
     terms: List[Tuple[float, str]] = []
     for coeff, ops in split_ham:
@@ -373,7 +401,8 @@ def prune_hamiltonian(split_ham:SplitHam) -> SplitHam:
         return True
 
     #split_ham = [it for it in split_ham if filter_Z_only(it[1])]
-    split_ham = approx_merge_hamiltonian(split_ham)
+    #split_ham = approx_merge_hamiltonian(split_ham)
+    split_ham = approx_replace_hamiltonian(split_ham)
     split_ham = [it for it in split_ham if abs(it[0]) > 1e-2]
     split_ham.sort(key=lambda it: abs(it[0]), reverse=True)
     return split_ham
@@ -573,6 +602,9 @@ def zne_repeat_circuit(circ:Circuit, n_repeat:int=1) -> Circuit:
     return circ_new
 
 def estimate_rescaler(mol, shots:int=10000) -> float:
+    # see vis_noise_scale.py
+    return 0.89971224375925
+
     # 去极化信道和比特翻转信道宏观上都会使得测量值极差变小，尝试估计一下(线性)缩放比
     sim = HKSSimulator('mqvector', n_qubits=mol.n_qubits)
     circ = Circuit()

@@ -137,7 +137,7 @@ $ \Delta E $ 为各样本优化前后的能量值之差，来对数尺度地放�
 \Delta E &= E_{\mathrm{before}} - E_{\mathrm{after}} \\
 \tilde{\Delta x} &= \Delta x * (w^{\frac{\mathrm{cur\_iter}}{\mathrm{decay\_per\_iter}}}) * \mathrm{log}(1 + \Delta E) \\
 \mu_{i+1}^\ast &= (1 - m) * \mu_i^\ast + m * \hat{\theta_i} \\
-\theta_{i+1}^\ast &= (1 - lr) * \theta_i^\ast + \tilde{\Delta x} * \mu_{i+1}^\ast \\
+\theta_{i+1}^\ast &= (1 - \tilde{\Delta x}) * \theta_i^\ast + \tilde{\Delta x} * \mu_{i+1}^\ast \\
 \end{split}
 \label{eq:update1}
 \end{equation}
