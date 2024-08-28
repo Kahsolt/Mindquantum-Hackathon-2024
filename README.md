@@ -6,6 +6,7 @@
 
 Contest page: [https://competition.huaweicloud.com/information/1000042022/introduction](https://competition.huaweicloud.com/information/1000042022/introduction)  
 Team Name: Quiscus  
+Award: 二等奖 (QSim) + 三等奖 (QAOA) + 特等奖 (QAIA)  
 
 
 ### Quickstart
